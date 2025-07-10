@@ -54,7 +54,7 @@ const ChessDashboard = () => {
 
       try {
         setLoading(true);
-        const API_URL = 'http://localhost:3000';
+        const API_URL = 'https://chesswithbenefits-server.onrender.com';
         
         const response = await axios.get(`${API_URL}/api/games/history/${userId}`, {
           headers: {

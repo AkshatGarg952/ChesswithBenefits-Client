@@ -20,6 +20,7 @@ const PlayerCard = ({
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const offerTimeoutRef = useRef(null);
+  const iceQueueRef = useRef([]); // NEW: to queue ICEs before remote description
 
   // Timer Logic
   useEffect(() => {
@@ -119,12 +120,22 @@ const PlayerCard = ({
         answer
       });
 
+      // Process queued ICE candidates after setting remote description
+      for (const candidate of iceQueueRef.current) {
+        try {
+          await peer.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error("Error adding queued ICE:", err);
+        }
+      }
+      iceQueueRef.current = [];
+
       clearTimeout(offerTimeoutRef.current);
     };
 
     const init = async () => {
       if (!isPlayer1) {
-        await setupLocalStream(); // Just show own stream
+        await setupLocalStream();
         return;
       }
 
@@ -139,15 +150,29 @@ const PlayerCard = ({
       socket.on("call-answered", async ({ answer }) => {
         if (peerRef.current) {
           await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+
+          // Add any ICEs received before remote description was set
+          for (const candidate of iceQueueRef.current) {
+            try {
+              await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (err) {
+              console.error("Error adding queued ICE:", err);
+            }
+          }
+          iceQueueRef.current = [];
         }
       });
 
       socket.on("ice-candidate", async ({ candidate }) => {
         if (peerRef.current) {
-          try {
-            await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-          } catch (err) {
-            console.error("ICE error:", err);
+          if (peerRef.current.remoteDescription) {
+            try {
+              await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (err) {
+              console.error("ICE error:", err);
+            }
+          } else {
+            iceQueueRef.current.push(candidate);
           }
         }
       });
@@ -163,7 +188,6 @@ const PlayerCard = ({
     };
   }, [opponentSocketId, isPlayer1]);
 
-  // Ensure video loads stream after render
   useEffect(() => {
     if (stream && localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -182,7 +206,6 @@ const PlayerCard = ({
         ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200'
         : 'border-gray-200 shadow-md'
     } ${className}`}>
-      {/* Player Info */}
       <div className="flex items-center justify-between mb-1.5 lg:mb-4">
         <div className="flex items-center space-x-1 lg:space-x-2">
           <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${
@@ -201,7 +224,6 @@ const PlayerCard = ({
         </div>
       </div>
 
-      {/* Video Area */}
       <div className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
         isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
       }`}>
@@ -211,8 +233,6 @@ const PlayerCard = ({
           <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-lg" />
         )}
       </div>
-
-  
     </div>
   );
 };

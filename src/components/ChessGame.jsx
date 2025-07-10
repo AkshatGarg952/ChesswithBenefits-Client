@@ -186,7 +186,7 @@ setSession("fen", chess.fen());
       console.log(prompt);
 
       try {
-        const res = await fetch("http://localhost:3000/api/commentary", {
+        const res = await fetch("https://chesswithbenefits-server.onrender.com/api/commentary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt })
@@ -241,7 +241,7 @@ setSession("fen", updatedGame.fen());
     }
 
     try {
-      const res = await fetch("http://localhost:3000/api/commentary", {
+      const res = await fetch("https://chesswithbenefits-server.onrender.com/api/commentary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })

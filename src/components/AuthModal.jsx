@@ -21,7 +21,7 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
 
      try {
     const response = await fetch(
-      mode === 'login' ? 'http://localhost:3000/api/users/login' : 'http://localhost:3000/api/users/register',
+      mode === 'login' ? 'https://chesswithbenefits-server.onrender.com/api/users/login' : 'https://chesswithbenefits-server.onrender.com/api/users/register',
       {
         method: 'POST',
         headers: {

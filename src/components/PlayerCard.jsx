@@ -20,7 +20,8 @@ const PlayerCard = ({
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const offerTimeoutRef = useRef(null);
-  const iceQueueRef = useRef([]); // NEW: to queue ICEs before remote description
+  const hasCalledRef = useRef(false);
+  const iceQueueRef = useRef([]);
 
   // Timer Logic
   useEffect(() => {
@@ -36,12 +37,9 @@ const PlayerCard = ({
   useEffect(() => {
     const handleGameStart = () => setHasGameStarted(true);
     socket.on("bothPlayersJoined", handleGameStart);
-    return () => {
-      socket.off("bothPlayersJoined", handleGameStart);
-    };
+    return () => socket.off("bothPlayersJoined", handleGameStart);
   }, []);
 
-  // Setup Local Stream and WebRTC
   useEffect(() => {
     const setupLocalStream = async () => {
       try {
@@ -59,6 +57,9 @@ const PlayerCard = ({
     };
 
     const initCaller = async () => {
+      if (hasCalledRef.current) return;
+      hasCalledRef.current = true;
+
       const mediaStream = await setupLocalStream();
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
@@ -120,7 +121,6 @@ const PlayerCard = ({
         answer
       });
 
-      // Process queued ICE candidates after setting remote description
       for (const candidate of iceQueueRef.current) {
         try {
           await peer.addIceCandidate(new RTCIceCandidate(candidate));
@@ -149,17 +149,21 @@ const PlayerCard = ({
 
       socket.on("call-answered", async ({ answer }) => {
         if (peerRef.current) {
-          await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-
-          // Add any ICEs received before remote description was set
-          for (const candidate of iceQueueRef.current) {
+          const signalingState = peerRef.current.signalingState;
+          console.log("🔄 call-answered received. Signaling state:", signalingState);
+          if (signalingState === "have-local-offer") {
             try {
-              await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+              await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+              for (const candidate of iceQueueRef.current) {
+                await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+              }
+              iceQueueRef.current = [];
             } catch (err) {
-              console.error("Error adding queued ICE:", err);
+              console.error("❌ Error setting remote answer:", err);
             }
+          } else {
+            console.warn("⚠️ Skipped setRemoteDescription due to invalid signalingState:", signalingState);
           }
-          iceQueueRef.current = [];
         }
       });
 

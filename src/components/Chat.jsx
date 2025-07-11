@@ -6,8 +6,7 @@ const Chat = ({ className = "", messages, onSendMessage, roomId }) => {
   console.log(roomId);
   const [newMessage, setNewMessage] = useState('');
   
-  useEffect(() => {
-  console.log("I AM LISTENING!");
+ 
   
 
 function formatTime12Hour(isoTime) {

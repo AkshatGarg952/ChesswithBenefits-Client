@@ -10,29 +10,6 @@ const Chat = ({ className = "", messages, onSendMessage, roomId }) => {
   console.log("I AM LISTENING!");
   
 
-  const handleReceiveMessage = (serverMessage) => {
-    console.log("Receiving the message!");
-    console.log(serverMessage);
-    const incomingMsg = {
-      id:Date.now(),
-      message: serverMessage.message,
-      isSent: false,
-      time: new Date(serverMessage.time).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    };
-    onSendMessage(incomingMsg);
-  };
-
-  socket.on("ReceiveMessage", handleReceiveMessage);
-
-  return () => {
-    socket.off("ReceiveMessage", handleReceiveMessage);
-  };
-}, []);
-
-
 function formatTime12Hour(isoTime) {
   return new Date(isoTime).toLocaleTimeString('en-IN', {
     hour: '2-digit',

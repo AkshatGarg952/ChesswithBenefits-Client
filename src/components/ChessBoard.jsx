@@ -4,11 +4,14 @@ import Confetti from 'react-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
+
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const recognition = new SpeechRecognition();
-recognition.continuous = true;
-recognition.interimResults = false;
-recognition.lang = 'en-US';
+const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+if (recognition) {
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+}
 
 const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, handleDraw, handleResign, gameStarted }) => {
   const isBlack = color === "black";
@@ -16,101 +19,117 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
   const [windowSize, setWindowSize] = useState({ width: 300, height: 300 });
   const [recording, setRecording] = useState(false);
 
-
-  
   useEffect(() => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight });
   }, []);
 
-useEffect(() => {
-  // If mode is switched away from voice, stop listening
-  if (mode !== "voice") {
-    stopListening();
-  }
+  useEffect(() => {
+    if (!recognition) return;
 
-  return () => {
-    stopListening(); // cleanup
-  };
-}, [mode]);
+    const handleResult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      console.log("🎤 Heard:", transcript);
 
+      if (transcript.startsWith("jarvis")) {
+        const command = transcript.replace("jarvis", "").trim();
+        handleVoiceCommand(command);
+      } else {
+        console.log("Ignoring non-Jarvis command");
+      }
+    };
 
+    recognition.onresult = handleResult;
 
-const startListening = () => {
-  if (!recording) {
+    recognition.onend = () => {
+      console.log("🎤 Voice recognition ended");
+      setRecording(false);
+    };
+
+    // Stop recognition when mode is not voice
+    if (mode !== "voice") {
+      stopListening();
+    }
+
+    return () => {
+      stopListening();
+    };
+  }, [mode]);
+
+  const startListening = () => {
+    if (!recognition || recording) return;
     try {
       recognition.start();
       setRecording(true);
-      console.log("🎙️ Listening for one command...");
+      console.log("🎙️ Started listening");
     } catch (e) {
       console.warn("⚠️ Failed to start recognition:", e);
     }
-  }
-};
+  };
 
-const stopListening = () => {
-  try {
-    recognition.stop();
-    setRecording(false);
-    console.log("🛑 Voice recognition stopped.");
-  } catch (e) {
-    console.warn("⚠️ Failed to stop recognition:", e);
-  }
-};
-
-
-recognition.onresult = (event) => {
-  const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-  console.log("🎤 Heard:", transcript);
-
-  if (transcript.startsWith("jarvis")) {
-    const command = transcript.replace("jarvis", "").trim();
-    handleVoiceCommand(command);
-  } else {
-    console.log("Ignoring non-Jarvis command");
-  }
-};
-  
-
-recognition.onend = () => {
-  console.log("🎤 onend triggered");
-  setRecording(false); // Make sure buttons update properly
-};
-
-
-
-
-recognition.onresult = (event) => {
-  const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-
-  console.log("🎤 Heard:", transcript);
-
-  if (transcript.startsWith("jarvis")) {
-    const command = transcript.replace("jarvis", "").trim();
-    handleVoiceCommand(command);
-  } else {
-    console.log("Ignoring non-Jarvis command");
-  }
-};
-
-const handleVoiceCommand = (command) => {
-  const move = parseSpokenMove(command);
-  console.log("♟️ Parsed move from voice:", move);
-
-  if (move) {
-    const copy = new Chess(gameState.fen());
-    const result = copy.move(move);
-    if (result) {
-      console.log("✅ Move made by voice:", result);
-      onMove(result, copy);
-    } else {
-      console.warn("❌ Invalid move:", move);
+  const stopListening = () => {
+    if (!recognition) return;
+    try {
+      recognition.stop();
+      setRecording(false);
+      console.log("🛑 Stopped listening");
+    } catch (e) {
+      console.warn("⚠️ Failed to stop recognition:", e);
     }
-  } else {
-    console.warn("❌ Could not parse move from command:", command);
-  }
-};
+  };
 
+  const handleVoiceCommand = (command) => {
+    const move = parseSpokenMove(command);
+    console.log("♟️ Parsed voice move:", move);
 
+    if (move) {
+      const copy = new Chess(gameState.fen());
+      const result = copy.move(move);
+      if (result) {
+        onMove(result, copy);
+      } else {
+        console.warn("❌ Invalid move:", move);
+      }
+    } else {
+      console.warn("❌ Could not parse voice move");
+    }
+  };
+
+  const parseSpokenMove = (text) => {
+    const wordToNum = {
+      one: "1", two: "2", three: "3", four: "4",
+      five: "5", six: "6", seven: "7", eight: "8",
+    };
+
+    let cleaned = text
+      .toLowerCase()
+      .replace(/\b(one|two|three|four|five|six|seven|eight)\b/g, match => wordToNum[match])
+      .replace(/\b(to|too|two)\b/g, " ")
+      .replace(/\bmove\b/g, "")
+      .replace(/[^a-h1-8\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    console.log("🧹 Cleaned voice input:", cleaned);
+    const tokens = cleaned.split(" ");
+    if (tokens.length < 2) return null;
+
+    const validSquare = (s) => /^[a-h][1-8]$/.test(s);
+    const possibleCombos = [];
+
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const from = tokens[i] + tokens[i + 1];
+      if (validSquare(from)) {
+        for (let j = i + 2; j < tokens.length - 1; j++) {
+          const to = tokens[j] + tokens[j + 1];
+          if (validSquare(to)) {
+            possibleCombos.push({ from, to });
+          }
+        }
+      }
+    }
+
+    return possibleCombos.length > 0 ? { ...possibleCombos[0], promotion: "q" } : null;
+  };
 
   const onDrop = (from, to) => {
     const copy = new Chess(gameState.fen());
@@ -122,122 +141,51 @@ const handleVoiceCommand = (command) => {
     return false;
   };
 
-const parseSpokenMove = (text) => {
-  const wordToNum = {
-    one: "1", two: "2", three: "3", four: "4",
-    five: "5", six: "6", seven: "7", eight: "8",
-  };
-
-  // Normalize input
-  let cleaned = text
-    .toLowerCase()
-    .replace(/\b(one|two|three|four|five|six|seven|eight)\b/g, (match) => wordToNum[match])
-    .replace(/\b(to|too|two)\b/g, " ") // ignore "to"/"two"
-    .replace(/\bmove\b/g, "") // ignore word "move"
-    .replace(/[^a-h1-8\s]/g, "") // strip non-chess junk
-    .replace(/\s+/g, " ")
-    .trim();
-
-  console.log("🧹 Cleaned voice input:", cleaned);
-
-  const tokens = cleaned.split(" ");
-  if (tokens.length < 2) {
-    console.warn("⚠️ Not enough tokens to form a move:", tokens);
-    return null;
-  }
-
-  // Try combining tokens into two valid squares
-  const validSquare = (s) => /^[a-h][1-8]$/.test(s);
-  const possibleCombos = [];
-
-  // Try all 2-token combinations
-  for (let i = 0; i < tokens.length - 1; i++) {
-    const from = tokens[i] + tokens[i + 1];
-    if (validSquare(from)) {
-      for (let j = i + 2; j < tokens.length - 1; j++) {
-        const to = tokens[j] + tokens[j + 1];
-        if (validSquare(to)) {
-          possibleCombos.push({ from, to });
-        }
-      }
-    }
-  }
-
-  if (possibleCombos.length > 0) {
-    const move = possibleCombos[0]; // pick the first valid one
-    return { ...move, promotion: "q" };
-  }
-
-  console.warn("❌ No valid from/to square found in:", tokens);
-  return null;
-};
-
-
   if (!gameState) return null;
 
   return (
     <div className={`relative bg-white rounded-xl p-3 shadow-lg border ${className}`}>
-      {status === "win" && (
-        <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={400} recycle={false} />
-      )}
+      {status === "win" && <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={400} recycle={false} />}
 
       <Chessboard
         position={gameState.fen()}
         boardOrientation={isBlack ? "black" : "white"}
         onPieceDrop={onDrop}
         isDraggablePiece={({ piece }) => {
-          console.log("🚫 Piece drag check:", {
-    piece,
-    status,
-    mode,
-    gameStarted,
-    color,
-    isBlack,
-    canDrag: !!piece && !status && mode !== "voice" && gameStarted && (isBlack ? piece.startsWith("b") : piece.startsWith("w")),
-  });
           if (!piece || status || mode === "voice" || !gameStarted) return false;
           return (isBlack ? piece.startsWith("b") : piece.startsWith("w"));
         }}
       />
 
       <div className="mt-4 flex flex-wrap justify-center items-center gap-4">
-  <button
-    className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded"
-    onClick={handleDraw}
-  >
-    🤝 Offer Draw
-  </button>
+        <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded" onClick={handleDraw}>
+          🤝 Offer Draw
+        </button>
 
-  <button
-    className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded"
-    onClick={handleResign}
-  >
-    🏳️ Resign
-  </button>
+        <button className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded" onClick={handleResign}>
+          🏳️ Resign
+        </button>
 
-  {mode === "voice" && (
-    <>
-      <button
-        onClick={startListening}
-        disabled={recording}
-        className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded disabled:opacity-50"
-      >
-        🎙 Start Voice
-      </button>
+        {mode === "voice" && (
+          <>
+            <button
+              onClick={startListening}
+              disabled={recording}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded disabled:opacity-50"
+            >
+              🎙 Start Voice
+            </button>
 
-      <button
-        onClick={stopListening}
-        disabled={!recording}
-        className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-4 py-2 rounded disabled:opacity-50"
-      >
-        🛑 Cancel Voice
-      </button>
-    </>
-  )}
-</div>
-
-
-
+            <button
+              onClick={stopListening}
+              disabled={!recording}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-4 py-2 rounded disabled:opacity-50"
+            >
+              🛑 Cancel Voice
+            </button>
+          </>
+        )}
+      </div>
 
       <AnimatePresence>
         {status && (
@@ -264,8 +212,6 @@ const parseSpokenMove = (text) => {
         )}
       </AnimatePresence>
     </div>
-
-
   );
 };
 

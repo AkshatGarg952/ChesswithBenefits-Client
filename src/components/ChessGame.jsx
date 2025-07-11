@@ -143,6 +143,8 @@ useEffect(() => {
 }, []);
 
   
+  useEffect(() => {
+  console.log("I AM LISTENING!");
   const handleReceiveMessage = (serverMessage) => {
     console.log("Receiving the message!");
     console.log(serverMessage);
@@ -157,9 +159,7 @@ useEffect(() => {
     };
     handleSendMessage(incomingMsg);
   };
-
   socket.on("ReceiveMessage", handleReceiveMessage);
-
   return () => {
     socket.off("ReceiveMessage", handleReceiveMessage);
   };

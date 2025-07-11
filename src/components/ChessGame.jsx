@@ -142,6 +142,29 @@ useEffect(() => {
   };
 }, []);
 
+  
+  const handleReceiveMessage = (serverMessage) => {
+    console.log("Receiving the message!");
+    console.log(serverMessage);
+    const incomingMsg = {
+      id:Date.now(),
+      message: serverMessage.message,
+      isSent: false,
+      time: new Date(serverMessage.time).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+    handleSendMessage(incomingMsg);
+  };
+
+  socket.on("ReceiveMessage", handleReceiveMessage);
+
+  return () => {
+    socket.off("ReceiveMessage", handleReceiveMessage);
+  };
+}, []);
+
 
 useEffect(() => {
   const handleReceiveMove = async ({ move, fen, gameStatus, winner, allMoves }) => {

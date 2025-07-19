@@ -242,61 +242,83 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-1 lg:p-4">
       {!isMobile && (
-        <div className="grid grid-cols-4 gap-4 max-w-6xl mx-auto">
-          <div className="space-y-4">
-            <PlayerCard {...player1} isPlayer1={true} opponentSocketId={opponentSocketId} />
-            <MoveHistory moves={moves} className="h-80" />
-          </div>
-          <div className="col-span-2 min-h-[500px]">
-            <ChessBoard
-              color={color}
-              onMove={handleMove}
-              gameState={gameState}
-              status={status}
-              mode={mode}
-              handleDraw={handleDraw}
-              handleResign={handleResign}
-              gameStarted={gameStarted}
-              isDraggablePiece={({ piece }) => {
-                if (!piece) return false;
-                return (isBlack && piece.startsWith('b')) || (!isBlack && piece.startsWith('w'));
-              }}
-            />
-          </div>
-          <div className="space-y-4">
-            <PlayerCard {...player2} />
-            <Chat
-              className="h-80"
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              roomId={roomId}
-            />
-          </div>
-        </div>
-      )}
+  <div className="grid grid-cols-4 gap-4 max-w-6xl mx-auto">
+    <div className="space-y-4">
+      <PlayerCard
+        key={`player1-${opponentSocketId || 'waiting'}`}
+        {...player1}
+        isPlayer1={true}
+        opponentSocketId={opponentSocketId}
+      />
+      <MoveHistory moves={moves} className="h-80" />
+    </div>
+    <div className="col-span-2 min-h-[500px]">
+      <ChessBoard
+        key={`chessboard-${gameId || 'nogame'}`}
+        color={color}
+        onMove={handleMove}
+        gameState={gameState}
+        status={status}
+        mode={mode}
+        handleDraw={handleDraw}
+        handleResign={handleResign}
+        gameStarted={gameStarted}
+        isDraggablePiece={({ piece }) => {
+          if (!piece) return false;
+          return (isBlack && piece.startsWith('b')) || (!isBlack && piece.startsWith('w'));
+        }}
+      />
+    </div>
+    <div className="space-y-4">
+      <PlayerCard
+        key={`player2-${userId}`}
+        {...player2}
+      />
+      <Chat
+        className="h-80"
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        roomId={roomId}
+      />
+    </div>
+  </div>
+)}
+
 
       {isMobile && (
-        <div className="w-full max-w-[400px] mx-auto space-y-3 px-2">
-          <div className="grid grid-cols-2 gap-2">
-            <PlayerCard {...player1} className="h-44" isPlayer1={true} opponentSocketId={opponentSocketId} />
-            <PlayerCard {...player2} className="h-44" />
-          </div>
-          <div className="h-[450px] w-full">
-            <ChessBoard
-              color={color}
-              onMove={handleMove}
-              gameState={gameState}
-              status={status}
-              mode={mode}
-              handleDraw={handleDraw}
-              handleResign={handleResign}
-              gameStarted={gameStarted}
-              isDraggablePiece={({ piece }) => {
-                if (!piece) return false;
-                return (isBlack && piece.startsWith('b')) || (!isBlack && piece.startsWith('w'));
-              }}
-            />
-          </div>
+  <div className="w-full max-w-[400px] mx-auto space-y-3 px-2">
+    <div className="grid grid-cols-2 gap-2">
+      <PlayerCard
+        key={`mobile-player1-${opponentSocketId || 'waiting'}`}
+        {...player1}
+        className="h-44"
+        isPlayer1={true}
+        opponentSocketId={opponentSocketId}
+      />
+      <PlayerCard
+        key={`mobile-player2-${userId}`}
+        {...player2}
+        className="h-44"
+      />
+    </div>
+    <div className="h-[450px] w-full">
+      <ChessBoard
+        key={`mobile-chessboard-${gameId || 'nogame'}`}
+        color={color}
+        onMove={handleMove}
+        gameState={gameState}
+        status={status}
+        mode={mode}
+        handleDraw={handleDraw}
+        handleResign={handleResign}
+        gameStarted={gameStarted}
+        isDraggablePiece={({ piece }) => {
+          if (!piece) return false;
+          return (isBlack && piece.startsWith('b')) || (!isBlack && piece.startsWith('w'));
+        }}
+      />
+    </div>
+
           <div className="fixed bottom-3 left-3 right-3 flex justify-between pointer-events-none z-10">
             <button onClick={() => setShowMoveHistory(true)} className="w-11 h-11 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all duration-300 hover:scale-110 pointer-events-auto">
               <RotateCcw className="w-4 h-4 mx-auto" />

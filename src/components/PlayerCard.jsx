@@ -48,24 +48,8 @@ const PlayerCard = ({
     }
   };
 
-  const toggleMic = () => {
-    if (stream) {
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-        setIsMicEnabled(track.enabled);
-      });
-    }
-  };
 
-  const toggleVideo = () => {
-    if (stream) {
-      stream.getVideoTracks().forEach(track => {
-        track.enabled = !track.enabled;
-        setIsVideoEnabled(track.enabled);
-      });
-    }
-  };
-
+   
   // Process pending ICE candidates after remote description is set
   const processPendingIceCandidates = async () => {
     if (peerRef.current && peerRef.current.remoteDescription) {
@@ -330,33 +314,7 @@ const PlayerCard = ({
         />
       </div>
 
-      {/* Mic/Video Toggle Buttons */}
-      {!isPlayer1 && (
-        <div className="mt-2 flex justify-center space-x-3 flex-wrap">
-          <button
-            onClick={toggleMic}
-            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full shadow m-1"
-            title={isMicEnabled ? "Mute Mic" : "Unmute Mic"}
-          >
-            {isMicEnabled ? (
-              <Mic className="w-5 h-5 text-green-600" />
-            ) : (
-              <MicOff className="w-5 h-5 text-red-500" />
-            )}
-          </button>
-          <button
-            onClick={toggleVideo}
-            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full shadow m-1"
-            title={isVideoEnabled ? "Turn Off Video" : "Turn On Video"}
-          >
-            {isVideoEnabled ? (
-              <Video className="w-5 h-5 text-green-600" />
-            ) : (
-              <VideoOff className="w-5 h-5 text-red-500" />
-            )}
-          </button>
-        </div>
-      )}
+    
     </div>
   );
 };

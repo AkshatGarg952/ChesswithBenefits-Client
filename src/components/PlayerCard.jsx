@@ -1,4 +1,4 @@
-import { Crown, Clock } from 'lucide-react';
+import { Video, Crown, Clock, Mic, MicOff, VideoOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import socket from "../socket/SocketConnection.jsx";
 
@@ -6,16 +6,17 @@ const PlayerCard = ({
   playerName,
   initialTime = 600,
   isActive,
-  isPlayer1 = false,
+  isPlayer1 = false,  
   className = "",
   opponentSocketId
 }) => {
+  console.log(initialTime);
+  console.log(isActive);
   const [time, setTime] = useState(initialTime);
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [hasGameStarted, setHasGameStarted] = useState(false);
   const [stream, setStream] = useState(null);
-
   const peerRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -23,19 +24,20 @@ const PlayerCard = ({
   const isInitiator = useRef(false);
 
   const setupLocalStream = async () => {
-    if (stream) return stream;
-
+    if (stream) return stream; // Return existing stream if available
+    
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setStream(mediaStream);
 
-      // ✅ Assign stream to the correct ref
-      if (!isPlayer1 && localVideoRef.current) {
+      // Save stream to state
+      setStream(mediaStream);
+      
+      // Set to video ref
+      if (localVideoRef.current) {
         localVideoRef.current.srcObject = mediaStream;
-      } else if (isPlayer1 && remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = mediaStream;
       }
 
+      // Initially mute/unmute tracks based on state
       mediaStream.getAudioTracks().forEach(track => track.enabled = isMicEnabled);
       mediaStream.getVideoTracks().forEach(track => track.enabled = isVideoEnabled);
 
@@ -46,8 +48,49 @@ const PlayerCard = ({
     }
   };
 
+  const toggleMic = () => {
+    if (stream) {
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMicEnabled(audioTrack.enabled);
+        
+        // Also update the track being sent through peer connection
+        if (peerRef.current) {
+          const sender = peerRef.current.getSenders().find(s => 
+            s.track && s.track.kind === 'audio'
+          );
+          if (sender && sender.track) {
+            sender.track.enabled = audioTrack.enabled;
+          }
+        }
+      }
+    }
+  };
+
+  const toggleVideo = () => {
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoEnabled(videoTrack.enabled);
+        
+        // Also update the track being sent through peer connection
+        if (peerRef.current) {
+          const sender = peerRef.current.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
+          );
+          if (sender && sender.track) {
+            sender.track.enabled = videoTrack.enabled;
+          }
+        }
+      }
+    }
+  };
+
+  // Process pending ICE candidates after remote description is set
   const processPendingIceCandidates = async () => {
-    if (peerRef.current?.remoteDescription) {
+    if (peerRef.current && peerRef.current.remoteDescription) {
       while (pendingIceCandidates.current.length > 0) {
         const candidate = pendingIceCandidates.current.shift();
         try {
@@ -59,6 +102,7 @@ const PlayerCard = ({
     }
   };
 
+  // Timer logic
   useEffect(() => {
     let interval;
     if (isActive && hasGameStarted && time > 0) {
@@ -69,14 +113,19 @@ const PlayerCard = ({
     return () => clearInterval(interval);
   }, [isActive, time, hasGameStarted]);
 
+  // Game start listener
   useEffect(() => {
     const handleGameStart = () => setHasGameStarted(true);
     socket.on("bothPlayersJoined", handleGameStart);
-    return () => socket.off("bothPlayersJoined", handleGameStart);
+    return () => {
+      socket.off("bothPlayersJoined", handleGameStart);
+    };
   }, []);
 
+  // WebRTC setup
   useEffect(() => {
     if (!opponentSocketId) {
+      // Just setup local stream for non-Player1 or when no opponent
       setupLocalStream();
       return;
     }
@@ -86,7 +135,9 @@ const PlayerCard = ({
     let isConnectionActive = true;
 
     const createPeerConnection = async () => {
-      if (peerRef.current) peerRef.current.close();
+      if (peerRef.current) {
+        peerRef.current.close();
+      }
 
       peer = new RTCPeerConnection({
         iceServers: [
@@ -94,6 +145,7 @@ const PlayerCard = ({
           { urls: 'stun:stun1.l.google.com:19302' }
         ]
       });
+      
       peerRef.current = peer;
 
       const mediaStream = await setupLocalStream();
@@ -118,53 +170,51 @@ const PlayerCard = ({
         }
       };
 
+      peer.onconnectionstatechange = () => {
+        console.log('Peer connection state:', peer.connectionState);
+        if (peer.connectionState === 'failed') {
+          console.log('Peer connection failed, attempting restart');
+        }
+      };
+
       return peer;
     };
 
     const handleIncomingCall = async ({ from, offer }) => {
       if (!isConnectionActive) return;
+      
       try {
+        console.log('Handling incoming call from:', from);
         peer = await createPeerConnection();
         isInitiator.current = false;
 
         await peer.setRemoteDescription(new RTCSessionDescription(offer));
+        
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
 
-        socket.emit("answer-call", { targetSocketId: from, answer });
+        socket.emit("answer-call", {
+          targetSocketId: from,
+          answer
+        });
+
+        // Process any pending ICE candidates
         await processPendingIceCandidates();
+
         clearTimeout(offerTimeout);
       } catch (error) {
         console.error('Error handling incoming call:', error);
       }
     };
 
-    const handleCallAnswered = async ({ answer }) => {
-      if (!isConnectionActive || !peerRef.current) return;
-      try {
-        if (peerRef.current.signalingState === 'have-local-offer') {
-          await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-          await processPendingIceCandidates();
-        }
-      } catch (error) {
-        console.error('Error handling call answer:', error);
-      }
-    };
-
-    const handleIceCandidate = async ({ candidate }) => {
-      if (!isConnectionActive || !peerRef.current) return;
-      if (peerRef.current.remoteDescription) {
-        await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } else {
-        pendingIceCandidates.current.push(candidate);
-      }
-    };
-
     const initCaller = async () => {
       if (!isConnectionActive) return;
+      
       try {
+        console.log('Initiating call to:', opponentSocketId);
         peer = await createPeerConnection();
         isInitiator.current = true;
+
         const offer = await peer.createOffer();
         await peer.setLocalDescription(offer);
 
@@ -177,16 +227,49 @@ const PlayerCard = ({
       }
     };
 
+    const handleCallAnswered = async ({ answer }) => {
+      if (!isConnectionActive || !peerRef.current) return;
+      
+      try {
+        console.log('Call answered');
+        if (peerRef.current.signalingState === 'have-local-offer') {
+          await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+          // Process any pending ICE candidates
+          await processPendingIceCandidates();
+        }
+      } catch (error) {
+        console.error('Error handling call answer:', error);
+      }
+    };
+
+    const handleIceCandidate = async ({ candidate }) => {
+      if (!isConnectionActive || !peerRef.current) return;
+      
+      try {
+        if (peerRef.current.remoteDescription) {
+          await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } else {
+          // Store candidate for later processing
+          pendingIceCandidates.current.push(candidate);
+        }
+      } catch (err) {
+        console.error("ICE candidate error:", err);
+      }
+    };
+
     const init = async () => {
       if (!isPlayer1) {
+        // Just show local video for non-Player1
         await setupLocalStream();
         return;
       }
 
+      // Set up event listeners
       socket.on("incoming-call", handleIncomingCall);
       socket.on("call-answered", handleCallAnswered);
       socket.on("ice-candidate", handleIceCandidate);
 
+      // If no incoming call after 3s, initiate call
       offerTimeout = setTimeout(() => {
         if (isConnectionActive) {
           initCaller();
@@ -199,24 +282,29 @@ const PlayerCard = ({
     return () => {
       isConnectionActive = false;
       clearTimeout(offerTimeout);
+      
       if (peerRef.current) {
         peerRef.current.close();
         peerRef.current = null;
       }
+      
       pendingIceCandidates.current = [];
+      
       socket.off("incoming-call", handleIncomingCall);
       socket.off("call-answered", handleCallAnswered);
       socket.off("ice-candidate", handleIceCandidate);
     };
+
   }, [opponentSocketId, isPlayer1]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [stream]);
+  }, []);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -225,44 +313,54 @@ const PlayerCard = ({
   };
 
   return (
-    <div className={`bg-white rounded-xl lg:rounded-2xl p-2 lg:p-4 border-2 transition-all duration-300 ${
-      isActive ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200' : 'border-gray-200 shadow-md'
-    } ${className}`}>
-      <div className="flex items-center justify-between mb-1.5 lg:mb-4">
-        <div className="flex items-center space-x-1 lg:space-x-2">
-          <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${
-            isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'
-          }`} />
-          <span className="font-semibold text-gray-800 text-xs lg:text-base">
-            {playerName}
-            <span className="ml-1 text-[10px] lg:text-xs text-gray-500">
-              ({opponentSocketId ? "Opponent" : "You"})
-            </span>
+  <div className={`bg-white rounded-xl lg:rounded-2xl p-2 lg:p-4 border-2 transition-all duration-300 ${
+    isActive 
+      ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200' 
+      : 'border-gray-200 shadow-md'
+  } ${className}`}>
+    
+    {/* Player Info */}
+    <div className="flex items-center justify-between mb-1.5 lg:mb-4">
+      <div className="flex items-center space-x-1 lg:space-x-2">
+        <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${
+          isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'
+        }`} />
+        <span className="font-semibold text-gray-800 text-xs lg:text-base">
+          {playerName}
+          <span className="ml-1 text-[10px] lg:text-xs text-gray-500">
+            ({opponentSocketId ? "Opponent" : "You"})
           </span>
-          {!isPlayer1 && <Crown className="w-3 h-3 lg:w-4 lg:h-4 text-yellow-500" />}
-        </div>
-        <div className={`flex items-center space-x-1 ${isActive ? 'text-orange-600' : 'text-gray-600'}`}>
-          <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
-          <span className={`font-mono font-bold text-xs lg:text-sm ${time < 60 ? 'text-red-500' : ''}`}>
-            {formatTime(time)}
-          </span>
-        </div>
+        </span>
+        {!isPlayer1 && <Crown className="w-3 h-3 lg:w-4 lg:h-4 text-yellow-500" />}
       </div>
-
-      {/* ✅ Fixed Video Stream */}
-      <div className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
-        isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
+      <div className={`flex items-center space-x-1 ${
+        isActive ? 'text-orange-600' : 'text-gray-600'
       }`}>
-        <video
-          ref={!isPlayer1 ? localVideoRef : remoteVideoRef}
-          autoPlay
-          playsInline
-          muted={!isPlayer1}
-          className="w-full h-full object-cover rounded-lg"
-        />
+        <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
+        <span className={`font-mono font-bold text-xs lg:text-sm ${
+          time < 60 ? 'text-red-500' : ''
+        }`}>{formatTime(time)}</span>
       </div>
     </div>
-  );
+
+    {/* Video Call Area */}
+    <div
+      className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
+        isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
+      }`}
+    >
+      <video
+        ref={isPlayer1 ? remoteVideoRef : localVideoRef}
+        autoPlay
+        playsInline
+        muted={!isPlayer1}
+        className="w-full h-full object-cover rounded-lg"
+      />
+    </div>
+
+  </div>
+);
+
 };
 
 export default PlayerCard;

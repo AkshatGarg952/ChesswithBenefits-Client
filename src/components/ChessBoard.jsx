@@ -5,136 +5,165 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const recognition = SpeechRecognition ? new SpeechRecognition() : null;
-if (recognition) {
-  recognition.continuous = true;
-  recognition.interimResults = false;
-  recognition.lang = 'en-US';
-}
-
 const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, handleDraw, handleResign, gameStarted }) => {
   const isBlack = color === "black";
   const navigate = useNavigate();
   const [windowSize, setWindowSize] = useState({ width: 300, height: 300 });
+
   const [recording, setRecording] = useState(false);
+  const [spokenText, setSpokenText] = useState("");
+  const spokenTextRef = useRef("");
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight });
   }, []);
 
+  // Initialize speech recognition
   useEffect(() => {
-    if (!recognition) return;
-
-    const handleResult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-      console.log("🎤 Heard:", transcript);
-
-      if (transcript.startsWith("jarvis")) {
-        const command = transcript.replace("jarvis", "").trim();
-        handleVoiceCommand(command);
-      } else {
-        console.log("Ignoring non-Jarvis command");
-      }
-    };
-
-    recognition.onresult = handleResult;
-
-    recognition.onend = () => {
-      console.log("🎤 Voice recognition ended");
-      setRecording(false);
-    };
-
-    // Stop recognition when mode is not voice
-    if (mode !== "voice") {
-      stopListening();
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.warn("Speech recognition not supported in this browser");
+      return;
     }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    
+    recognitionRef.current = recognition;
 
     return () => {
-      stopListening();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
-  }, [mode]);
+  }, []);
 
-  const startListening = () => {
-    if (!recognition || recording) return;
-    try {
-      recognition.start();
-      setRecording(true);
-      console.log("🎙️ Started listening");
-    } catch (e) {
-      console.warn("⚠️ Failed to start recognition:", e);
+  const parseSpokenMove = (text) => {
+    if (!text) return null;
+    const wordToNum = {
+      one: "1", two: "2", three: "3", four: "4",
+      five: "5", six: "6", seven: "7", eight: "8", 'ate': '8'
+    };
+    let cleaned = text.toLowerCase()
+      .replace(/\b(one|two|three|four|five|six|seven|eight|ate)\b/g, match => wordToNum[match])
+      .replace(/[^a-h1-8]/g, "");
+    const squares = cleaned.match(/[a-h][1-8]/g);
+    if (squares && squares.length >= 2) {
+      console.log(`✅ Parsed move: from ${squares[0]} to ${squares[1]}`);
+      return { from: squares[0], to: squares[1], promotion: "q" };
     }
+    console.warn(`❌ Could not find a valid move in text: "${text}"`);
+    return null;
   };
 
-  const stopListening = () => {
-    if (!recognition) return;
-    try {
-      recognition.stop();
-      setRecording(false);
-      console.log("🛑 Stopped listening");
-    } catch (e) {
-      console.warn("⚠️ Failed to stop recognition:", e);
-    }
-  };
-
-  const handleVoiceCommand = (command) => {
-    const move = parseSpokenMove(command);
-    console.log("♟️ Parsed voice move:", move);
-
+  const processVoiceCommand = (text) => {
+    const move = parseSpokenMove(text);
     if (move) {
       const copy = new Chess(gameState.fen());
       const result = copy.move(move);
       if (result) {
         onMove(result, copy);
       } else {
-        console.warn("❌ Invalid move:", move);
+        console.warn("⚠️ Invalid or illegal move:", move);
       }
-    } else {
-      console.warn("❌ Could not parse voice move");
     }
   };
 
-  const parseSpokenMove = (text) => {
-    const wordToNum = {
-      one: "1", two: "2", three: "3", four: "4",
-      five: "5", six: "6", seven: "7", eight: "8",
-    };
-
-    let cleaned = text
-      .toLowerCase()
-      .replace(/\b(one|two|three|four|five|six|seven|eight)\b/g, match => wordToNum[match])
-      .replace(/\b(to|too|two)\b/g, " ")
-      .replace(/\bmove\b/g, "")
-      .replace(/[^a-h1-8\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    console.log("🧹 Cleaned voice input:", cleaned);
-    const tokens = cleaned.split(" ");
-    if (tokens.length < 2) return null;
-
-    const validSquare = (s) => /^[a-h][1-8]$/.test(s);
-    const possibleCombos = [];
-
-    for (let i = 0; i < tokens.length - 1; i++) {
-      const from = tokens[i] + tokens[i + 1];
-      if (validSquare(from)) {
-        for (let j = i + 2; j < tokens.length - 1; j++) {
-          const to = tokens[j] + tokens[j + 1];
-          if (validSquare(to)) {
-            possibleCombos.push({ from, to });
-          }
-        }
-      }
+  const startListening = async () => {
+    if (recording || !recognitionRef.current) return;
+    
+    // Check if browser supports speech recognition
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.");
+      return;
     }
 
-    return possibleCombos.length > 0 ? { ...possibleCombos[0], promotion: "q" } : null;
+    try {
+      // Request microphone permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      setSpokenText("");
+      spokenTextRef.current = "";
+      
+      const recognition = recognitionRef.current;
+      
+      // Set up event handlers
+      recognition.onstart = () => {
+        console.log("Speech recognition started");
+        setRecording(true);
+      };
+
+      recognition.onresult = (event) => {
+        let fullTranscript = "";
+        for (const result of event.results) {
+          fullTranscript += result[0].transcript;
+        }
+        spokenTextRef.current = fullTranscript;
+        setSpokenText(fullTranscript);
+        console.log("Current transcript:", fullTranscript);
+      };
+
+      recognition.onend = () => {
+        console.log("Speech recognition ended");
+        if (recording) { 
+          processVoiceCommand(spokenTextRef.current);
+        }
+        setRecording(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setRecording(false);
+        
+        switch(event.error) {
+          case 'not-allowed':
+            alert("Microphone permission was denied. Please allow microphone access and try again.");
+            break;
+          case 'no-speech':
+            console.log("No speech detected");
+            break;
+          case 'audio-capture':
+            alert("No microphone was found. Please check your microphone connection.");
+            break;
+          case 'network':
+            alert("Network error occurred during speech recognition.");
+            break;
+          default:
+            alert(`Speech recognition error: ${event.error}`);
+        }
+      };
+
+      // Start recognition
+      recognition.start();
+      
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      if (error.name === 'NotAllowedError') {
+        alert("Microphone access denied. Please allow microphone permissions in your browser settings.");
+      } else if (error.name === 'NotFoundError') {
+        alert("No microphone found. Please connect a microphone and try again.");
+      } else {
+        alert("Error starting voice recognition. Please check your microphone settings.");
+      }
+      setRecording(false);
+    }
+  };
+
+  const stopListening = () => {
+    if (!recording || !recognitionRef.current) return;
+    recognitionRef.current.stop();
   };
 
   const onDrop = (from, to) => {
     const copy = new Chess(gameState.fen());
     const move = copy.move({ from, to, promotion: "q" });
+    console.log("Move attempt:", move);
     if (move) {
+      console.log("Valid move");
       onMove(move, copy);
       return true;
     }
@@ -143,71 +172,50 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
 
   if (!gameState) return null;
 
+  const isVoiceSupported = ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+
   return (
     <div className={`relative bg-white rounded-xl p-3 shadow-lg border ${className}`}>
       {status === "win" && <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={400} recycle={false} />}
-
       <Chessboard
         position={gameState.fen()}
         boardOrientation={isBlack ? "black" : "white"}
         onPieceDrop={onDrop}
-        isDraggablePiece={({ piece }) => {
-          if (!piece || status || mode === "voice" || !gameStarted) return false;
-          return (isBlack ? piece.startsWith("b") : piece.startsWith("w"));
-        }}
+        isDraggablePiece={({ piece }) => !(!piece || status || mode === "voice" || !gameStarted) && (isBlack ? piece.startsWith("b") : piece.startsWith("w"))}
       />
-
+      
       <div className="mt-4 flex flex-wrap justify-center items-center gap-4">
-        <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded" onClick={handleDraw}>
-          🤝 Offer Draw
-        </button>
-
-        <button className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded" onClick={handleResign}>
-          🏳️ Resign
-        </button>
-
-        {mode === "voice" && (
-          <>
-            <button
-              onClick={startListening}
-              disabled={recording}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded disabled:opacity-50"
-            >
-              🎙 Start Voice
-            </button>
-
-            <button
-              onClick={stopListening}
-              disabled={!recording}
-              className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-4 py-2 rounded disabled:opacity-50"
-            >
-              🛑 Cancel Voice
-            </button>
-          </>
+        <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded" onClick={handleDraw}>🤝 Offer Draw</button>
+        <button className="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded" onClick={handleResign}>🏳️ Resign</button>
+        {mode === "voice" && isVoiceSupported && !recording && (
+          <button onClick={startListening} className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded">🎙️ Start Voice</button>
+        )}
+        {mode === "voice" && isVoiceSupported && recording && (
+          <button onClick={stopListening} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded animate-pulse">🛑 Stop Voice & Make Move</button>
+        )}
+        {mode === "voice" && !isVoiceSupported && (
+          <div className="text-red-600 text-sm">Voice recognition not supported in this browser</div>
         )}
       </div>
 
+      {/* Show current spoken text */}
+      {mode === "voice" && recording && spokenText && (
+        <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
+          <strong>Listening:</strong> {spokenText}
+        </div>
+      )}
+      
       <AnimatePresence>
         {status && (
-          <motion.div
-            className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white p-6 rounded-xl"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-          >
+          <motion.div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white p-6 rounded-xl"
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}>
             <h2 className="text-3xl font-bold mb-4">
               {status === "draw" && "🤝 Game Draw!"}
               {status === "win" && "🏆 You Won!"}
               {status === "lose" && "💔 You Lost!"}
             </h2>
-            {(status === "draw" || status === "lose") && (
-              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
-                {status === "draw" ? "♟️♟️♟️" : "😢"}
-              </motion.div>
-            )}
-            <button onClick={() => navigate("/dashboard")} className="mt-6 bg-white text-black px-6 py-2 rounded-full">
-              Go to Dashboard
-            </button>
+            {(status === "draw" || status === "lose") && (<motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1 }}>{status === "draw" ? "♟️♟️♟️" : "😢"}</motion.div>)}
+            <button onClick={() => navigate("/dashboard")} className="mt-6 bg-white text-black px-6 py-2 rounded-full">Go to Dashboard</button>
           </motion.div>
         )}
       </AnimatePresence>

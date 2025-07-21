@@ -48,8 +48,46 @@ const PlayerCard = ({
     }
   };
 
+  const toggleMic = () => {
+    if (stream) {
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMicEnabled(audioTrack.enabled);
+        
+        // Also update the track being sent through peer connection
+        if (peerRef.current) {
+          const sender = peerRef.current.getSenders().find(s => 
+            s.track && s.track.kind === 'audio'
+          );
+          if (sender && sender.track) {
+            sender.track.enabled = audioTrack.enabled;
+          }
+        }
+      }
+    }
+  };
 
-   
+  const toggleVideo = () => {
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoEnabled(videoTrack.enabled);
+        
+        // Also update the track being sent through peer connection
+        if (peerRef.current) {
+          const sender = peerRef.current.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
+          );
+          if (sender && sender.track) {
+            sender.track.enabled = videoTrack.enabled;
+          }
+        }
+      }
+    }
+  };
+
   // Process pending ICE candidates after remote description is set
   const processPendingIceCandidates = async () => {
     if (peerRef.current && peerRef.current.remoteDescription) {
@@ -275,48 +313,54 @@ const PlayerCard = ({
   };
 
   return (
-    <div className={`bg-white rounded-xl lg:rounded-2xl p-2 lg:p-4 border-2 transition-all duration-300 ${
-      isActive 
-        ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200' 
-        : 'border-gray-200 shadow-md'
-    } ${className}`}>
-      {/* Player Info */}
-      <div className="flex items-center justify-between mb-1.5 lg:mb-4">
-        <div className="flex items-center space-x-1 lg:space-x-2">
-          <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${
-            isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'
-          }`} />
-          <span className="font-semibold text-gray-800 text-xs lg:text-base">{playerName}</span>
-          {!isPlayer1 && <Crown className="w-3 h-3 lg:w-4 lg:h-4 text-yellow-500" />}
-        </div>
-        <div className={`flex items-center space-x-1 ${
-          isActive ? 'text-orange-600' : 'text-gray-600'
-        }`}>
-          <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
-          <span className={`font-mono font-bold text-xs lg:text-sm ${
-            time < 60 ? 'text-red-500' : ''
-          }`}>{formatTime(time)}</span>
-        </div>
-      </div>
-
-      {/* Video Call Area */}
-      <div
-        className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
-          isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
-        }`}
-      >
-        <video
-          ref={isPlayer1 ? remoteVideoRef : localVideoRef}
-          autoPlay
-          playsInline
-          muted={!isPlayer1} // Only mute for local video
-          className="w-full h-full object-cover rounded-lg"
-        />
-      </div>
-
+  <div className={`bg-white rounded-xl lg:rounded-2xl p-2 lg:p-4 border-2 transition-all duration-300 ${
+    isActive 
+      ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200' 
+      : 'border-gray-200 shadow-md'
+  } ${className}`}>
     
+    {/* Player Info */}
+    <div className="flex items-center justify-between mb-1.5 lg:mb-4">
+      <div className="flex items-center space-x-1 lg:space-x-2">
+        <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${
+          isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'
+        }`} />
+        <span className="font-semibold text-gray-800 text-xs lg:text-base">
+          {playerName}
+          <span className="ml-1 text-[10px] lg:text-xs text-gray-500">
+            ({opponentSocketId ? "Opponent" : "You"})
+          </span>
+        </span>
+        {!isPlayer1 && <Crown className="w-3 h-3 lg:w-4 lg:h-4 text-yellow-500" />}
+      </div>
+      <div className={`flex items-center space-x-1 ${
+        isActive ? 'text-orange-600' : 'text-gray-600'
+      }`}>
+        <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
+        <span className={`font-mono font-bold text-xs lg:text-sm ${
+          time < 60 ? 'text-red-500' : ''
+        }`}>{formatTime(time)}</span>
+      </div>
     </div>
-  );
+
+    {/* Video Call Area */}
+    <div
+      className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
+        isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
+      }`}
+    >
+      <video
+        ref={isPlayer1 ? remoteVideoRef : localVideoRef}
+        autoPlay
+        playsInline
+        muted={!isPlayer1} // Only mute for local video
+        className="w-full h-full object-cover rounded-lg"
+      />
+    </div>
+
+  </div>
+);
+
 };
 
 export default PlayerCard;

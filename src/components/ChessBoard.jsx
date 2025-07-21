@@ -14,7 +14,6 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
   const [spokenText, setSpokenText] = useState("");
   const spokenTextRef = useRef("");
   const recognitionRef = useRef(null);
-  const isStoppingRef = useRef(false); // Add flag to track manual stopping
 
   useEffect(() => {
     setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -33,9 +32,6 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
-    
-    // Add these settings to improve stability
-    recognition.maxAlternatives = 1;
     
     recognitionRef.current = recognition;
 
@@ -86,27 +82,14 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
       return;
     }
 
-    // Check internet connection
-    if (!navigator.onLine) {
-      alert("No internet connection. Speech recognition requires an internet connection.");
-      return;
-    }
-
     try {
       // Request microphone permission first
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
       setSpokenText("");
       spokenTextRef.current = "";
-      isStoppingRef.current = false; // Reset stopping flag
       
       const recognition = recognitionRef.current;
-      
-      // Clear any existing event handlers to avoid duplicates
-      recognition.onstart = null;
-      recognition.onresult = null;
-      recognition.onend = null;
-      recognition.onerror = null;
       
       // Set up event handlers
       recognition.onstart = () => {
@@ -116,63 +99,41 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
 
       recognition.onresult = (event) => {
         let fullTranscript = "";
-        let finalTranscript = "";
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            fullTranscript += transcript;
-          }
+        for (const result of event.results) {
+          fullTranscript += result[0].transcript;
         }
-        
-        const currentText = finalTranscript || fullTranscript;
-        spokenTextRef.current = currentText;
-        setSpokenText(currentText);
-        console.log("Current transcript:", currentText);
+        spokenTextRef.current = fullTranscript;
+        setSpokenText(fullTranscript);
+        console.log("Current transcript:", fullTranscript);
       };
 
       recognition.onend = () => {
         console.log("Speech recognition ended");
-        setRecording(false);
-        
-        // Only process the command if we manually stopped (not due to error or timeout)
-        if (isStoppingRef.current && spokenTextRef.current.trim()) {
+        if (recording) { 
           processVoiceCommand(spokenTextRef.current);
         }
-        
-        isStoppingRef.current = false;
+        setRecording(false);
       };
 
       recognition.onerror = (event) => {
         console.error("Speech recognition error:", event.error);
         setRecording(false);
-        isStoppingRef.current = false;
         
         switch(event.error) {
           case 'not-allowed':
             alert("Microphone permission was denied. Please allow microphone access and try again.");
             break;
           case 'no-speech':
-            console.log("No speech detected - this is normal, recognition will continue");
-            // Don't show alert for no-speech as it's common
+            console.log("No speech detected");
             break;
           case 'audio-capture':
             alert("No microphone was found. Please check your microphone connection.");
             break;
           case 'network':
-            alert("Network error: Please check your internet connection and try again. You can also try refreshing the page.");
-            break;
-          case 'service-not-allowed':
-            alert("Speech recognition service is not allowed. This may be due to browser settings or network restrictions.");
-            break;
-          case 'aborted':
-            console.log("Speech recognition was aborted");
+            alert("Network error occurred during speech recognition.");
             break;
           default:
-            console.warn(`Speech recognition error: ${event.error}`);
-            alert(`Speech recognition error: ${event.error}. Try refreshing the page or using a different browser.`);
+            alert(`Speech recognition error: ${event.error}`);
         }
       };
 
@@ -181,8 +142,6 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
       
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      setRecording(false);
-      
       if (error.name === 'NotAllowedError') {
         alert("Microphone access denied. Please allow microphone permissions in your browser settings.");
       } else if (error.name === 'NotFoundError') {
@@ -190,13 +149,12 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
       } else {
         alert("Error starting voice recognition. Please check your microphone settings.");
       }
+      setRecording(false);
     }
   };
 
   const stopListening = () => {
     if (!recording || !recognitionRef.current) return;
-    
-    isStoppingRef.current = true; // Set flag to indicate manual stop
     recognitionRef.current.stop();
   };
 
@@ -240,21 +198,10 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
         )}
       </div>
 
-      {/* Add visual feedback for voice recognition */}
-      {mode === "voice" && recording && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-blue-700 font-medium">Listening...</span>
-          </div>
-          {spokenText && (
-            <div className="text-sm text-gray-700">
-              <strong>Heard:</strong> "{spokenText}"
-            </div>
-          )}
-          <div className="text-xs text-gray-500 mt-1">
-            Say your move like "e2 to e4" or "knight to f3"
-          </div>
+      {/* Show current spoken text */}
+      {mode === "voice" && recording && spokenText && (
+        <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
+          <strong>Listening:</strong> {spokenText}
         </div>
       )}
       

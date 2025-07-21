@@ -353,7 +353,7 @@ const PlayerCard = ({
         ref={isPlayer1 ? remoteVideoRef : localVideoRef}
         autoPlay
         playsInline
-        muted={!isPlayer1} // Only mute for local video
+        muted={!isPlayer1}
         className="w-full h-full object-cover rounded-lg"
       />
     </div>

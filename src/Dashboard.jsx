@@ -8,18 +8,11 @@ import { getSession, setSession, clearGameSession } from './utils/session.js';
 const ChessDashboard = () => {
   clearGameSession()
   
-  if(getSession("gameId")){
-    console.log("Seesionid hai")
-  }
-  else{
-    console.log("nahi hai")
-  }
+
   const navigate = useNavigate();
   
   const token = sessionStorage.getItem('token');
   const userId = sessionStorage.getItem('user');
-  console.log(token);
-  console.log(userId);
   const [currentView, setCurrentView] = useState('dashboard');
   const [gameChartType, setGameChartType] = useState('pie');
   const [moveChartType, setMoveChartType] = useState('pie');
@@ -54,7 +47,8 @@ const ChessDashboard = () => {
 
       try {
         setLoading(true);
-        const API_URL = 'https://chesswithbenefits-server.onrender.com';
+        const API_URL = 'http://localhost:3000';
+
         
         const response = await axios.get(`${API_URL}/api/games/history/${userId}`, {
           headers: {
@@ -110,59 +104,86 @@ const ChessDashboard = () => {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
   }
 
-  const handleJoinRoom = () => {
-    if (roomId.trim()) {
-      const rId = roomId;
-      const c = commentaryMode;
-      const g = mode;
-      alert(`Joining room: ${rId} with commentary ${commentaryMode ? 'enabled' : 'disabled'}`);
-      setCurrentView('dashboard');
-      setRoomId('');
-      setCommentaryMode("off");
-      setMode("manual");
-      socket.emit("joinRoom", { userId, roomId: rId, color: undefined });
+  // const handleJoinRoom = () => {
+  //   if (roomId.trim()) {
+  //     const rId = roomId;
+  //     const c = commentaryMode;
+  //     const g = mode;
+  //     alert(`Joining room: ${rId} with commentary ${commentaryMode ? 'enabled' : 'disabled'}`);
+  //     setCurrentView('dashboard');
+  //     setRoomId('');
+  //     setCommentaryMode("off");
+  //     setMode("manual");
+  //     socket.emit("joinRoom", { userId, roomId: rId, color: undefined });
       
-      socket.on("assignedColor", (color) => {
-        navigate("/game", {
-          state: {
-            color: color,
-            roomId: rId,
-            userId: userId,
-            commentary: c,
-            mode: g
-          }
-        });
-      });
-    } else {
-      alert('Please enter a valid Room ID');
-    }
-  };
+  //     socket.once("assignedColor", (color) => {
+  //       navigate("/game", {
+  //         state: {
+  //           color: color,
+  //           roomId: rId,
+  //           userId: userId,
+  //           commentary: c,
+  //           mode: g
+  //         }
+  //       });
+  //     });
+  //   } else {
+  //     alert('Please enter a valid Room ID');
+  //   }
+  // };
 
+  const handleJoinRoom = () => {
+  // 1. Validate that a Room ID was entered
+  if (roomId.trim()) {
+    
+    // 2. Prepare the data to be passed to the game page
+    const gameData = {
+      roomId: roomId,
+      userId: userId,
+      commentary: commentaryMode,
+      mode: mode,
+      color: undefined,
+    };
+
+    navigate("/game", { state: gameData });
+
+  } else {
+    alert('Please enter a valid Room ID');
+  }
+};
   const handleCreateRoom = () => {
-    const rId = generatedRoomId;
-    const color = selectedPiece;
-    const c = commentaryMode;
-    const g = mode;
+    // const rId = generatedRoomId;
+    // const color = selectedPiece;
+    // const c = commentaryMode;
+    // const g = mode;
+    const roomData = {
+      roomId: generatedRoomId,
+      color: selectedPiece,
+      userId: userId,
+      commentary: commentaryMode,
+      mode: mode,
+    };
     setCurrentView('dashboard');
     setSelectedPiece('white');
     setCommentaryMode("off");
     setGeneratedRoomId(generateRoomId());
     setMode("manual");
-    alert(`Room created: ${rId} with ${color} pieces and with commentary ${c ? 'enabled' : 'disabled'}`);
     
-    socket.emit("joinRoom", { userId, roomId: rId, color });
+    // socket.emit("joinRoom", { userId, roomId: rId, color });
     
-    socket.once("assignedColor", (color) => {
-      navigate("/game", {
-        state: {
-          color: color,
-          roomId: rId,
-          userId: userId,
-          commentary: c,
-          mode: g
-        }
-      });
-    });
+    // socket.once("assignedColor", (color) => {
+    //   navigate("/game", {
+    //     state: {
+    //       color: color,
+    //       roomId: rId,
+    //       userId: userId,
+    //       commentary: c,
+    //       mode: g
+    //     }
+    //   });
+    // });
+
+    navigate("/game", { state: roomData });
   };
 
   const renderNavbar = () => (

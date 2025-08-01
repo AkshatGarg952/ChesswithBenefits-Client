@@ -221,7 +221,8 @@ const player2 = {
   }, [commentary, moves, userId]);
 
   const handleMove = async (move, updatedGame) => {
-    socket.emit("SendMove", { move, gameId, userId, roomId });
+    const currentGameId = getSession("gameId") || gameId;
+    socket.emit("SendMove", { move, gameId:currentGameId, userId, roomId });
     const newMoves = [...moves, move.san];
     setSession("moves", newMoves);
     setMoves(newMoves);
@@ -268,7 +269,8 @@ const player2 = {
   };
 
   const acceptDraw = () => {
-    socket.emit("DrawAccepted", { roomId, gameId });
+    const currentGameId = getSession("gameId") || gameId;
+    socket.emit("DrawAccepted", { roomId, gameId:currentGameId });
     setDrawOfferVisible(false);
     setStatus("draw");
   };

@@ -121,6 +121,7 @@ const player2 = {
       setSession("currentPlayer", nextTurn);
       setSession("gameStarted", "true");
       
+      setgameId(gameId);
       setGameStarted(true);
     };
     

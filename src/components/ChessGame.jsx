@@ -190,7 +190,7 @@ const player2 = {
         };
 
         try {
-          const res = await fetch("http://localhost:3000/api/commentary", {
+          const res = await fetch("https://chesswithbenefits-server.onrender.com/api/commentary", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ prompt })
@@ -231,7 +231,7 @@ const player2 = {
       };
 
       try {
-        const res = await fetch("http://localhost:3000/api/commentary", {
+        const res = await fetch("https://chesswithbenefits-server.onrender.com/api/commentary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt })

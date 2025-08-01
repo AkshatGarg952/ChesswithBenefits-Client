@@ -46,7 +46,8 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   const [messages, setMessages] = useState(() => chatStorage.get(roomId, userId));
   
   const isBlack = playerColor === 'black';
-  
+
+  console.log("le re ll le", gameId);
   // const player1 = {
   //   name: "Opponent",
   //   initialTime: sessionStorage.getItem("time"),

@@ -46,20 +46,6 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   const [messages, setMessages] = useState(() => chatStorage.get(roomId, userId));
   
   const isBlack = playerColor === 'black';
-
-  console.log("le re ll le", gameId);
-  // const player1 = {
-  //   name: "Opponent",
-  //   initialTime: sessionStorage.getItem("time"),
-  //   isActive: currentPlayer !== playerColor
-  // };
-
-  // const player2 = {
-  //   name: "You",
-  //   initialTime: sessionStorage.getItem("time"),
-  //   isActive: currentPlayer === playerColor
-  // };
-
   const player1 = {
   name: "Opponent",
   initialTime: sessionStorage.getItem("time") || 600,
@@ -265,7 +251,8 @@ const player2 = {
   const handleDraw = () => socket.emit("Draw", { roomId });
   const handleResign = () => {
     setStatus("lose");
-    socket.emit("Resign", { roomId, gameId, userId });
+    const currentGameId = getSession("gameId") || gameId;
+    socket.emit("Resign", { roomId, gameId:currentGameId, userId });
   };
 
   const acceptDraw = () => {
@@ -409,7 +396,8 @@ const player2 = {
               <button onClick={() => setShowBackWarning(false)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">🚀 Continue Game</button>
               <button onClick={() => {
                 setStatus("lose");
-                socket.emit("Resign", { roomId, gameId, userId });
+                const currentGameId = getSession("gameId") || gameId;
+                socket.emit("Resign", { roomId, gameId:currentGameId, userId });
                 setShowBackWarning(false);
                 // Be careful with hardcoding navigation like this
                 // window.removeEventListener('popstate', handleBackNavigation); 

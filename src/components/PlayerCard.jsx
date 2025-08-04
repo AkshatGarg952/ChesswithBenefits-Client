@@ -1,232 +1,542 @@
-// PlayerCard.jsx
-import { Crown, Clock, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Video, Crown, Clock, Mic, MicOff, VideoOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import socket from "../socket/SocketConnection.jsx";
-import { useWebRTC } from '../hooks/useWebRTC.js';
 
 const PlayerCard = ({
-    playerName,
-    initialTime = 600,
-    isActive,
-    className = "",
-    isCurrentUser = false,
-    color,
-    opponentSocketId
+  playerName,
+  initialTime = 600,
+  isActive,
+  isCurrentUser = false,  
+  className = "",
+  color,
+  gameId, // Added gameId prop
+  onTimeExpired // Added callback prop
 }) => {
-    // Timer state
-    const [time, setTime] = useState(parseInt(initialTime));
-    const [hasGameStarted, setHasGameStarted] = useState(!!opponentSocketId);
+  const [time, setTime] = useState(initialTime);
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [hasGameStarted, setHasGameStarted] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [opponentSocketId, setOpponentSocketId] = useState(null);
+  
+  const peerRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef = useRef(null); // Added timer ref
 
-    // WebRTC hook
-    const {
-        localStream,
-        remoteStream,
-        connectionState,
-        mediaError,
-        isMicEnabled,
-        isVideoEnabled,
-        toggleMic,
-        toggleVideo,
-    } = useWebRTC({ socket, opponentSocketId, isCurrentUser });
+  const setupLocalStream = async () => {
+    const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-    // Video refs
-    const localVideoRef = useRef(null);
-    const remoteVideoRef = useRef(null);
+    
+    streamRef.current = mediaStream;
+    setStream(mediaStream);
+    
+    // Set to video ref
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = mediaStream;
+    }
 
-    // Connect streams to video elements
-    useEffect(() => {
-        if (localVideoRef.current && localStream) {
-            localVideoRef.current.srcObject = localStream;
-            console.log('🎥 Local video connected to element');
-        }
-    }, [localStream]);
+    // Initially mute/unmute tracks based on state
+    const audioTrack = mediaStream.getAudioTracks()[0];
+    const videoTrack = mediaStream.getVideoTracks()[0];
+    
+    if (audioTrack) {
+      audioTrack.enabled = isMicEnabled;
+    }
+    if (videoTrack) {
+      videoTrack.enabled = isVideoEnabled;
+    }
 
-    useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            console.log('🎥 Remote video connected to element');
-        }
-    }, [remoteStream]);
+    return mediaStream;
+  };
 
-    // Game start detection
-    useEffect(() => {
-        setHasGameStarted(!!opponentSocketId);
-    }, [opponentSocketId]);
+  // Fixed toggle functions using streamRef for immediate access
+  const toggleMic = () => {
+    console.log('Toggle mic clicked, stream:', streamRef.current);
+    
+    // Try to get track from streamRef first, then from video element as fallback
+    let track = streamRef.current?.getAudioTracks()[0];
+    
+    // Fallback: get from video element if streamRef is not available
+    if (!track && localVideoRef.current && localVideoRef.current.srcObject) {
+      track = localVideoRef.current.srcObject.getAudioTracks()[0];
+    }
+    
+    console.log('Audio track:', track);
+    
+    if (track) {
+      track.enabled = !track.enabled;
+      setIsMicEnabled(track.enabled);
+      console.log('Mic toggled to:', track.enabled);
+    } else {
+      console.error('No audio track available');
+    }
+  };
 
-    // Timer logic
-    useEffect(() => {
-        if (isActive && hasGameStarted && time > 0) {
-            const interval = setInterval(() => {
-                setTime(prev => Math.max(0, prev - 1));
-            }, 1000);
-            return () => clearInterval(interval);
-        }
-    }, [isActive, hasGameStarted, time]);
+  const toggleVideo = () => {
+    console.log('Toggle video clicked, stream:', streamRef.current);
+    
+    // Try to get track from streamRef first, then from video element as fallback
+    let track = streamRef.current?.getVideoTracks()[0];
+    
+    // Fallback: get from video element if streamRef is not available
+    if (!track && localVideoRef.current && localVideoRef.current.srcObject) {
+      track = localVideoRef.current.srcObject.getVideoTracks()[0];
+    }
+    
+    console.log('Video track:', track);
+    
+    if (track) {
+      track.enabled = !track.enabled;
+      setIsVideoEnabled(track.enabled);
+      console.log('Video toggled to:', track.enabled);
+    } else {
+      console.error('No video track available');
+    }
+  };
 
-    // Helper functions
-    const formatTime = (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
-
-    // Video display logic - show local video for current user, remote for opponent
-    const showLocalVideo = isCurrentUser && localStream && isVideoEnabled;
-    const showRemoteVideo = !isCurrentUser && remoteStream;
-
-    const getStatusMessage = () => {
-        if (mediaError) return mediaError;
-        if (!opponentSocketId) return 'Waiting for opponent...';
+  // Load initial time from server on component mount
+  useEffect(() => {
+    const loadGameState = async () => {
+      try {
+        const response = await fetch(`/api/game/${gameId}/state`);
+        const gameState = await response.json();
         
-        switch (connectionState) {
-            case 'idle': return 'Ready to connect';
-            case 'requesting-media': return 'Requesting camera access...';
-            case 'ready': return 'Ready';
-            case 'connecting': return 'Connecting...';
-            case 'connected': return 'Connected';
-            case 'failed': return 'Connection failed';
-            case 'disconnected': return 'Reconnecting...';
-            case 'closed': return 'Call ended';
-            default: return 'Initializing...';
+        if (gameState) {
+          const playerTime = color === 'white' 
+            ? gameState.white_time_remaining 
+            : gameState.black_time_remaining;
+          
+          setTime(playerTime);
+          setHasGameStarted(gameState.game_status === 'active');
         }
+      } catch (error) {
+        console.error('Failed to load game state:', error);
+      }
     };
 
-    const getConnectionStatus = () => {
-        if (!opponentSocketId) return 'waiting';
-        if (connectionState === 'connected') return 'connected';
-        if (connectionState === 'connecting' || connectionState === 'requesting-media') return 'connecting';
-        if (connectionState === 'failed' || connectionState === 'disconnected') return 'error';
-        return 'idle';
+    if (gameId) {
+      loadGameState();
+    }
+  }, [gameId, color]);
+
+  // Sync timer with server every 5 seconds
+  useEffect(() => {
+    if (isCurrentUser && hasGameStarted && isActive) {
+      const syncInterval = setInterval(() => {
+        socket.emit('timer-update', {
+          gameId,
+          color,
+          timeRemaining: time
+        });
+      }, 5000);
+
+      return () => clearInterval(syncInterval);
+    }
+  }, [isCurrentUser, hasGameStarted, isActive, time, gameId, color]);
+
+  // Listen for timer sync from server
+  useEffect(() => {
+    const handleTimerSync = ({ color: syncColor, timeRemaining }) => {
+      if (syncColor !== color) { // Only update opponent's time
+        setTime(timeRemaining);
+      }
     };
 
-    const connectionStatus = getConnectionStatus();
+    socket.on('timer-sync', handleTimerSync);
+    return () => socket.off('timer-sync', handleTimerSync);
+  }, [color]);
 
-    return (
-        <div className={`bg-white rounded-xl p-2 lg:p-4 border-2 transition-all duration-300 ${
-            isActive ? 'border-orange-400 shadow-lg ring-2 ring-orange-200' : 'border-gray-200 shadow-md'
-        } ${className}`}>
-            
-            {/* Header with Player Info and Connection Status */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                    {/* Active player indicator */}
-                    <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'}`} />
-                    
-                    {/* Player name */}
-                    <span className="font-semibold text-gray-800 text-sm">
-                        {playerName}
-                    </span>
-                    
-                    {/* Chess piece color indicator */}
-                    <Crown className={`w-4 h-4 ${color === 'white' ? 'text-gray-300' : 'text-gray-800'}`} />
-                    
-                    {/* WebRTC connection status indicator */}
-                    <div 
-                        className={`w-2 h-2 rounded-full ${
-                            connectionStatus === 'connected' ? 'bg-green-500' :
-                            connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-                            connectionStatus === 'error' ? 'bg-red-500' :
-                            'bg-gray-400'
-                        }`} 
-                        title={getStatusMessage()} 
-                    />
-                </div>
-                
-                {/* Timer display */}
-                <div className={`flex items-center space-x-1 ${isActive ? 'text-orange-600' : 'text-gray-600'}`}>
-                    <Clock className="w-4 h-4" />
-                    <span className={`font-mono font-bold text-sm ${time < 60 ? 'text-red-500 animate-pulse' : ''}`}>
-                        {formatTime(time)}
-                    </span>
-                </div>
-            </div>
+  // Updated timer logic with time expiry check
+  useEffect(() => {
+    let interval;
+    if (isActive && hasGameStarted && time > 0) {
+      interval = setInterval(() => {
+        setTime(prev => {
+          const newTime = Math.max(0, prev - 1);
+          
+          // Check if time expired
+          if (newTime === 0 && isCurrentUser) {
+            socket.emit('time-expired', { gameId, color });
+            onTimeExpired?.(color);
+          }
+          
+          return newTime;
+        });
+      }, 1000);
+      timerRef.current = interval;
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, time, hasGameStarted, isCurrentUser, gameId, color, onTimeExpired]);
 
-            {/* Video Area */}
-            <div className={`aspect-video relative rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
-                isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
-            }`}>
-                
-                {/* Local video (for current user) */}
-                {isCurrentUser && (
-                    <video 
-                        ref={localVideoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted 
-                        className={`w-full h-full object-cover transition-opacity duration-300 ${
-                            showLocalVideo ? 'opacity-100' : 'opacity-0'
-                        }`} 
-                    />
-                )}
-                
-                {/* Remote video (for opponent) */}
-                {!isCurrentUser && (
-                    <video 
-                        ref={remoteVideoRef} 
-                        autoPlay 
-                        playsInline 
-                        className={`w-full h-full object-cover transition-opacity duration-300 ${
-                            showRemoteVideo ? 'opacity-100' : 'opacity-0'
-                        }`} 
-                    />
-                )}
-                
-                {/* Status overlay - shown when no video is available */}
-                {((isCurrentUser && !showLocalVideo) || (!isCurrentUser && !showRemoteVideo)) && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-400 p-4">
-                        <div className="text-4xl mb-2">
-                            {connectionStatus === 'connected' ? '📹' : 
-                             connectionStatus === 'connecting' ? '⏳' :
-                             connectionStatus === 'error' ? '❌' : 
-                             !opponentSocketId ? '👥' : '🎥'}
-                        </div>
-                        <p className="text-sm font-medium">{getStatusMessage()}</p>
-                        {connectionStatus === 'connecting' && (
-                            <div className="mt-2 w-6 h-6 border-2 border-gray-400 border-t-orange-500 rounded-full animate-spin"></div>
-                        )}
-                    </div>
-                )}
-            </div>
+  // Listen for game end events
+  useEffect(() => {
+    const handleGameEnd = ({ reason, winner, loser }) => {
+      if (reason === 'timeout') {
+        // Handle timeout game end
+        alert(`Game Over! ${winner} wins by timeout. ${loser} ran out of time.`);
+      }
+    };
 
-            {/* Media Controls - Show for everyone who has local stream */}
-            {localStream && (
-                <div className="flex justify-center space-x-2 mt-3">
-                    {/* Microphone toggle */}
-                    <button 
-                        onClick={toggleMic}
-                        className={`p-2 rounded-full transition-colors duration-200 ${
-                            isMicEnabled 
-                                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                : 'bg-red-100 text-red-600 hover:bg-red-200'
-                        }`}
-                        title={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
-                    >
-                        {isMicEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                    </button>
-                    
-                    {/* Video toggle */}
-                    <button 
-                        onClick={toggleVideo}
-                        className={`p-2 rounded-full transition-colors duration-200 ${
-                            isVideoEnabled 
-                                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                : 'bg-red-100 text-red-600 hover:bg-red-200'
-                        }`}
-                        title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
-                    >
-                        {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                    </button>
-                </div>
-            )}
+    socket.on('game-ended', handleGameEnd);
+    return () => socket.off('game-ended', handleGameEnd);
+  }, []);
 
-            {/* Media error display */}
-            {mediaError && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-xs text-red-600 text-center">{mediaError}</p>
-                </div>
-            )}
+  // WebRTC caller function
+  const initCaller = async (targetSocketId) => {
+    console.log(`📱 White player initiating call to:`, targetSocketId);
+    
+    // Cleanup existing connection if any
+    if (peerRef.current) {
+      peerRef.current.close();
+    }
+    
+    const mediaStream = await setupLocalStream();
+    const peer = new RTCPeerConnection();
+    peerRef.current = peer;
+
+    mediaStream.getTracks().forEach(track => peer.addTrack(track, mediaStream));
+
+    peer.onicecandidate = e => {
+      if (e.candidate) {
+        socket.emit("ice-candidate", {
+          targetSocketId: targetSocketId,
+          candidate: e.candidate
+        });
+      }
+    };
+
+    peer.ontrack = e => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = e.streams[0];
+      }
+    };
+
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+
+    socket.emit("call-user", {
+      targetSocketId: targetSocketId,
+      offer
+    });
+  };
+
+  // Game start listener with opponent socket ID from event
+  useEffect(() => {
+    const handleGameStart = async (data) => {
+      console.log("🎮 Both players joined!", data);
+      
+      // Extract opponent socket ID from the event
+      const { opponentSocketId: receivedOpponentSocketId, gameId, moves, fen, opponentUserId, opponentColor } = data;
+      
+      setHasGameStarted(true);
+      setOpponentSocketId(receivedOpponentSocketId);
+      
+      console.log("Opponent Socket ID:", receivedOpponentSocketId);
+      console.log("My Color:", color);
+      console.log("Opponent Color:", opponentColor);
+      
+      // White player initiates call immediately when both players join
+      if (color === 'white' && receivedOpponentSocketId && !isCurrentUser) {
+        console.log("🤍 White player: Initiating call as both players joined");
+        try {
+          await initCaller(receivedOpponentSocketId);
+        } catch (error) {
+          console.error("Failed to initiate call:", error);
+        }
+      }
+    };
+
+    socket.on("bothPlayersJoined", handleGameStart);
+    
+    return () => {
+      socket.off("bothPlayersJoined", handleGameStart);
+    };
+  }, [color, isCurrentUser]);
+
+  // WebRTC setup
+  useEffect(() => {
+    const setupLocalStreamForCurrentUser = async () => {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      
+      // Store in both ref and state
+      streamRef.current = mediaStream;
+      setStream(mediaStream);
+      
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = mediaStream;
+      }
+      
+      // Set initial track states
+      const audioTrack = mediaStream.getAudioTracks()[0];
+      const videoTrack = mediaStream.getVideoTracks()[0];
+      
+      if (audioTrack) {
+        audioTrack.enabled = isMicEnabled;
+      }
+      if (videoTrack) {
+        videoTrack.enabled = isVideoEnabled;
+      }
+      
+      return mediaStream;
+    };
+
+    if (isCurrentUser) {
+      setupLocalStreamForCurrentUser();
+      return;
+    }
+    
+    if (!opponentSocketId) return;
+
+    let peer;
+
+    const handleIncomingCall = async ({ from, offer }) => {
+      console.log(`📞 Incoming call received by ${color} player from:`, from);
+      
+      // Cleanup existing connection if any
+      if (peerRef.current) {
+        peerRef.current.close();
+      }
+      
+      const mediaStream = await setupLocalStream();
+      peer = new RTCPeerConnection();
+      peerRef.current = peer;
+
+      mediaStream.getTracks().forEach(track => peer.addTrack(track, mediaStream));
+    
+      peer.onicecandidate = e => {
+        if (e.candidate) {
+          socket.emit("ice-candidate", {
+            targetSocketId: from,
+            candidate: e.candidate
+          });
+        }
+      };
+
+      peer.ontrack = e => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = e.streams[0];
+        }
+      };
+
+      await peer.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+
+      socket.emit("answer-call", {
+        targetSocketId: from,
+        answer
+      });
+    };
+
+    const init = async () => {
+      if (isCurrentUser) {
+        await setupLocalStreamForCurrentUser();
+        return;
+      }
+
+      // Always listen for incoming calls (both colors can receive)
+      socket.on("incoming-call", handleIncomingCall);
+
+      if (color === 'white') {
+        console.log("🤍 White player: Will initiate call when both players join");
+      } else if (color === 'black') {
+        console.log("⚫ Black player: Waiting for incoming call only");
+      }
+
+      socket.on("call-answered", async ({ answer }) => {
+        if (peerRef.current) {
+          await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        }
+      });
+
+      socket.on("ice-candidate", async ({ candidate }) => {
+        if (peerRef.current) {
+          try {
+            await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (err) {
+            console.error("ICE candidate error:", err);
+          }
+        }
+      });
+    };
+
+    init();
+
+    return () => {
+      // Better cleanup
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
+      
+      // Clean up stream tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      setStream(null);
+
+      socket.off("incoming-call", handleIncomingCall);
+      socket.off("call-answered");
+      socket.off("ice-candidate");
+    };
+
+  }, [opponentSocketId, isCurrentUser, color, isMicEnabled, isVideoEnabled]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Connection status with clearer role descriptions
+  const getConnectionStatus = () => {
+    if (!opponentSocketId) return "👥 Waiting for opponent...";
+    
+    if (!hasGameStarted) return "⏳ Waiting for game start...";
+    
+    if (isCurrentUser) {
+      return "👤 Your video";
+    }
+    
+    if (color === 'white') {
+      return "🤍 White Player";
+    } else if (color === 'black') {
+      return "⚫ Black Player";  
+    }
+    
+    return "🎥 Ready";
+  };
+
+  return (
+    <div className={`bg-white rounded-xl lg:rounded-2xl p-2 lg:p-4 border-2 transition-all duration-300 ${
+      isActive 
+        ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200' 
+        : 'border-gray-200 shadow-md'
+    } ${className}`}>
+      {/* Player Info */}
+      <div className="flex items-center justify-between mb-1.5 lg:mb-4">
+        <div className="flex items-center space-x-1 lg:space-x-2">
+          <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${
+            isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'
+          }`} />
+          <span className="font-semibold text-gray-800 text-xs lg:text-base">{playerName}</span>
+          {isCurrentUser && <Crown className="w-3 h-3 lg:w-4 lg:h-4 text-yellow-500" />}
+          {/* Color-based role indicator */}
+          <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${
+            color === 'white' ? 'bg-gray-200 border border-gray-400' : 'bg-gray-800'
+          }`} title={`${color} pieces`} />
+          {/* Connection status indicator */}
+          <span className="text-xs text-gray-500">{getConnectionStatus()}</span>
         </div>
-    );
+        <div className={`flex items-center space-x-1 ${
+          isActive ? 'text-orange-600' : 'text-gray-600'
+        }`}>
+          <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
+          <span className={`font-mono font-bold text-xs lg:text-sm ${
+            time < 60 ? 'text-red-500 animate-pulse' : ''
+          }`}>{formatTime(time)}</span>
+        </div>
+      </div>
+
+      {/* Video Call Area */}
+      <div
+        className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${
+          isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
+        }`}
+      >
+        {/* Conditional video display based on user role and color */}
+        {isCurrentUser ? (
+          // Current User: Always show local video
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted={true} // Always muted for local user to avoid feedback
+            className="w-full h-full object-cover rounded-lg"
+          />
+        ) : (
+          // Opponent Display: Show remote video based on color/role
+          <>
+            {color === 'white' ? (
+              // White Player (Caller): Show answer received (remote video from black player)
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                muted={false} // Unmuted to hear opponent
+                className="w-full h-full object-cover rounded-lg"
+              />
+            ) : color === 'black' ? (
+              // Black Player (Receiver): Show offer received (remote video from white player)  
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                muted={false} // Unmuted to hear opponent
+                className="w-full h-full object-cover rounded-lg"
+              />
+            ) : null}
+          </>
+        )}
+        
+        {/* Show role indicator when no video stream */}
+        {!stream && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+            <div className="text-4xl mb-2">
+              {isCurrentUser ? '👤' : (color === 'white' ? '🤍' : '⚫')}
+            </div>
+            <p className="text-sm font-medium">
+              {isCurrentUser 
+                ? 'Your Video' 
+                : (color === 'white' ? 'White Player' : 'Black Player')
+              }
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {isCurrentUser 
+                ? 'Local Stream' 
+                : 'Waiting for connection...'
+              }
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Mic/Video Toggle Buttons - Only show when stream is available */}
+      {isCurrentUser && (stream || streamRef.current) && (
+        <div className="mt-2 flex justify-center space-x-3 flex-wrap">
+          <button
+            onClick={toggleMic}
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full shadow m-1 transition-colors"
+            title={isMicEnabled ? "Mute Mic" : "Unmute Mic"}
+          >
+            {isMicEnabled ? (
+              <Mic className="w-5 h-5 text-green-600" />
+            ) : (
+              <MicOff className="w-5 h-5 text-red-500" />
+            )}
+          </button>
+          <button
+            onClick={toggleVideo}
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full shadow m-1 transition-colors"
+            title={isVideoEnabled ? "Turn Off Video" : "Turn On Video"}
+          >
+            {isVideoEnabled ? (
+              <Video className="w-5 h-5 text-green-600" />
+            ) : (
+              <VideoOff className="w-5 h-5 text-red-500" />
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default PlayerCard;

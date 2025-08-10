@@ -44,17 +44,33 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   const [gameStarted, setGameStarted] = useState(() => getSession("gameStarted") === "true");
   const [showBackWarning, setShowBackWarning] = useState(false);
   const [messages, setMessages] = useState(() => chatStorage.get(roomId, userId));
-  
+   
+  const [whiteTimeLeft, setWhiteTimeLeft] = useState(600);
+  const [blackTimeLeft, setBlackTimeLeft] = useState(600);
+
+
+  useEffect(() => {
+    socket.on("gameOver", (data) => {
+      console.log("Game over event received:", data);
+      setGameOverData(data);
+      setStatus(data.status)
+    });
+    return () => {
+      socket.off("gameOver");
+    };
+  }, []);
+
+
   const isBlack = playerColor === 'black';
   const player1 = {
   name: "Opponent",
-  initialTime: sessionStorage.getItem("time") || 600,
+  initialTime: isBlack ? blackTimeLeft : whiteTimeLeft,
   isActive: currentPlayer !== playerColor
 };
 
 const player2 = {
   name: "You", 
-  initialTime: sessionStorage.getItem("time") || 600,
+  initialTime: isBlack ? whiteTimeLeft : blackTimeLeft,
   isActive: currentPlayer === playerColor
 };
 
@@ -96,19 +112,28 @@ const player2 = {
     socket.on("opponent-disconnected", handleOpponentDisconnected);
 
     return () => {
-        // ... all your existing socket.off calls
         socket.off("opponent-disconnected", handleOpponentDisconnected);
     };
-}, []); // This should be added to your existing useEffect with the empty dependency array
+}, []);
 
   useEffect(() => {
-    const handleBothPlayersJoined = async ({ gameId, fen, moves, opponentSocketId }) => {
+    const handleBothPlayersJoined = async ({ gameId, fen, moves, opponentSocketId, whiteTimeLeft, blackTimeLeft }) => {
       console.log("Both players joined");
+      setWhiteTimeLeft(whiteTimeLeft);
+      setBlackTimeLeft(blackTimeLeft);
+      if(playerColor === 'white') {
+        player2.initialTime = whiteTimeLeft;
+        player1.initialTime = blackTimeLeft;
+      }
+      else{
+        player2.initialTime = blackTimeLeft;
+        player1.initialTime = whiteTimeLeft;
+      }
       setOpponentSocketId(opponentSocketId);
       
       const { Chess } = await import("chess.js");
       const chess = new Chess(fen);
-      
+       
       setGameState(chess);
       setMoves(moves || []);
       
@@ -250,6 +275,7 @@ const player2 = {
   };
 
   const handleDraw = () => socket.emit("Draw", { roomId });
+
   const handleResign = () => {
     setStatus("lose");
     const currentGameId = getSession("gameId") || gameId;
@@ -400,9 +426,6 @@ const player2 = {
                 const currentGameId = getSession("gameId") || gameId;
                 socket.emit("Resign", { roomId, gameId:currentGameId, userId });
                 setShowBackWarning(false);
-                // Be careful with hardcoding navigation like this
-                // window.removeEventListener('popstate', handleBackNavigation); 
-                // window.history.go(-3);
               }} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">🔚 Finish Game</button>
             </div>
           </div>

@@ -18,14 +18,51 @@ const PlayerCard = ({
   const [hasGameStarted, setHasGameStarted] = useState(false);
   const [stream, setStream] = useState(null);
   const [opponentSocketId, setOpponentSocketId] = useState(null);
-  
+  const timerRef = useRef(null);
   const peerRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const streamRef = useRef(null);
-  const timerRef = useRef(null); // Added timer ref
 
-  const setupLocalStream = async () => {
+
+  useEffect(() => {
+    if (isActive) {
+      timerRef.current = setInterval(() => {
+        setTime((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isActive]);
+
+   useEffect(() => {
+    if (!isActive) return;
+    const syncInterval = setInterval(() => {
+      socket.emit("timer-update", {
+        gameId,
+        color,
+        timeRemaining: time,
+      });
+    }, 5000);
+    return () => clearInterval(syncInterval);
+  }, [isActive, time, gameId, color]);
+
+  
+  useEffect(() => {
+    const handleGameOver = () => clearInterval(timerRef.current);
+    socket.on("gameOver", handleGameOver);
+    return () => socket.off("gameOver", handleGameOver);
+  }, []);
+
+    const formatTime = (t) => {
+    const minutes = Math.floor(t / 60);
+    const seconds = t % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+
+const setupLocalStream = async () => {
     const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
     
@@ -51,7 +88,6 @@ const PlayerCard = ({
     return mediaStream;
   };
 
-  // Fixed toggle functions using streamRef for immediate access
   const toggleMic = () => {
     console.log('Toggle mic clicked, stream:', streamRef.current);
     
@@ -95,96 +131,6 @@ const PlayerCard = ({
       console.error('No video track available');
     }
   };
-
-  // Load initial time from server on component mount
-  useEffect(() => {
-    const loadGameState = async () => {
-      try {
-        const response = await fetch(`/api/game/${gameId}/state`);
-        const gameState = await response.json();
-        
-        if (gameState) {
-          const playerTime = color === 'white' 
-            ? gameState.white_time_remaining 
-            : gameState.black_time_remaining;
-          
-          setTime(playerTime);
-          setHasGameStarted(gameState.game_status === 'active');
-        }
-      } catch (error) {
-        console.error('Failed to load game state:', error);
-      }
-    };
-
-    if (gameId) {
-      loadGameState();
-    }
-  }, [gameId, color]);
-
-  // Sync timer with server every 5 seconds
-  useEffect(() => {
-    if (isCurrentUser && hasGameStarted && isActive) {
-      const syncInterval = setInterval(() => {
-        socket.emit('timer-update', {
-          gameId,
-          color,
-          timeRemaining: time
-        });
-      }, 5000);
-
-      return () => clearInterval(syncInterval);
-    }
-  }, [isCurrentUser, hasGameStarted, isActive, time, gameId, color]);
-
-  // Listen for timer sync from server
-  useEffect(() => {
-    const handleTimerSync = ({ color: syncColor, timeRemaining }) => {
-      if (syncColor !== color) { // Only update opponent's time
-        setTime(timeRemaining);
-      }
-    };
-
-    socket.on('timer-sync', handleTimerSync);
-    return () => socket.off('timer-sync', handleTimerSync);
-  }, [color]);
-
-  // Updated timer logic with time expiry check
-  useEffect(() => {
-    let interval;
-    if (isActive && hasGameStarted && time > 0) {
-      interval = setInterval(() => {
-        setTime(prev => {
-          const newTime = Math.max(0, prev - 1);
-          
-          // Check if time expired
-          if (newTime === 0 && isCurrentUser) {
-            socket.emit('time-expired', { gameId, color });
-            onTimeExpired?.(color);
-          }
-          
-          return newTime;
-        });
-      }, 1000);
-      timerRef.current = interval;
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isActive, time, hasGameStarted, isCurrentUser, gameId, color, onTimeExpired]);
-
-  // Listen for game end events
-  useEffect(() => {
-    const handleGameEnd = ({ reason, winner, loser }) => {
-      if (reason === 'timeout') {
-        // Handle timeout game end
-        alert(`Game Over! ${winner} wins by timeout. ${loser} ran out of time.`);
-      }
-    };
-
-    socket.on('game-ended', handleGameEnd);
-    return () => socket.off('game-ended', handleGameEnd);
-  }, []);
 
   // WebRTC caller function
   const initCaller = async (targetSocketId) => {
@@ -389,11 +335,6 @@ const PlayerCard = ({
 
   }, [opponentSocketId, isCurrentUser, color, isMicEnabled, isVideoEnabled]);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Connection status with clearer role descriptions
   const getConnectionStatus = () => {

@@ -62,17 +62,17 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
 
 
   const isBlack = playerColor === 'black';
-  const player1 = {
+const [player1, setPlayer1] = useState({
   name: "Opponent",
   initialTime: isBlack ? blackTimeLeft : whiteTimeLeft,
   isActive: currentPlayer !== playerColor
-};
+});
 
-const player2 = {
-  name: "You", 
+const [player2, setPlayer2] = useState({
+  name: "You",
   initialTime: isBlack ? whiteTimeLeft : blackTimeLeft,
   isActive: currentPlayer === playerColor
-};
+});
 
   function speak(text) {
     const u = new SpeechSynthesisUtterance(text);
@@ -121,14 +121,13 @@ const player2 = {
       console.log("Both players joined");
       setWhiteTimeLeft(whiteTimeLeft);
       setBlackTimeLeft(blackTimeLeft);
-      if(playerColor === 'white') {
-        player2.initialTime = whiteTimeLeft;
-        player1.initialTime = blackTimeLeft;
-      }
-      else{
-        player2.initialTime = blackTimeLeft;
-        player1.initialTime = whiteTimeLeft;
-      }
+      if (playerColor === 'white') {
+    setPlayer2(prev => ({ ...prev, initialTime: whiteTimeLeft }));
+    setPlayer1(prev => ({ ...prev, initialTime: blackTimeLeft }));
+  } else {
+    setPlayer2(prev => ({ ...prev, initialTime: blackTimeLeft }));
+    setPlayer1(prev => ({ ...prev, initialTime: whiteTimeLeft }));
+  }
       setOpponentSocketId(opponentSocketId);
       
       const { Chess } = await import("chess.js");

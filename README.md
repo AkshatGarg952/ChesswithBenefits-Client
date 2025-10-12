@@ -18,7 +18,6 @@ Chess with Benefits is an innovative chess platform that transforms traditional 
 ## Demo
 
 * Live Website: [Chess with Benefits](https://your-frontend-url.com)
-* Demo Video: [Watch Demo](your-demo-video-link)
 
 ## Installation
 
@@ -114,16 +113,6 @@ Comprehensive statistics dashboard displaying:
 - Opening repertoire analysis
 - Time management statistics
 
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
 ## Related Repositories
 
 * Backend Server: [ChesswithBenefits-Server](https://github.com/AkshatGarg952/ChesswithBenefits-Server)
@@ -137,7 +126,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 For any questions or suggestions, feel free to reach out:
 
 * GitHub: [@AkshatGarg952](https://github.com/AkshatGarg952)
-* Email: your-email@example.com
+* Email: gargakshat952@gmail.com
 
 ---
 

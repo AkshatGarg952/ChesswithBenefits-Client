@@ -24,7 +24,25 @@ const useWindowSize = () => {
 const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   const screenWidth = useWindowSize();
   const isMobile = screenWidth <= 690;
-  const [playerColor, setPlayerColor] = useState(color);
+
+  // --- PERSISTENCE FIX START ---
+  // If props are missing (e.g., after reload), try to get them from session
+  const effectiveUserId = userId || getSession("userId");
+  const effectiveRoomId = roomId || getSession("roomId");
+  const effectiveColor = color || getSession("color");
+  const effectiveCommentary = commentary || getSession("commentary");
+  const effectiveMode = mode || getSession("mode");
+
+  useEffect(() => {
+    if (userId) setSession("userId", userId);
+    if (roomId) setSession("roomId", roomId);
+    if (color) setSession("color", color);
+    if (commentary) setSession("commentary", commentary);
+    if (mode) setSession("mode", mode);
+  }, [userId, roomId, color, commentary, mode]);
+  // --- PERSISTENCE FIX END ---
+
+  const [playerColor, setPlayerColor] = useState(effectiveColor);
   const [currentPlayer, setCurrentPlayer] = useState(getSession("currentPlayer") || 'white');
   const [showMoveHistory, setShowMoveHistory] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -43,36 +61,40 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   const [drawOfferVisible, setDrawOfferVisible] = useState(false);
   const [gameStarted, setGameStarted] = useState(() => getSession("gameStarted") === "true");
   const [showBackWarning, setShowBackWarning] = useState(false);
-  const [messages, setMessages] = useState(() => chatStorage.get(roomId, userId));
-   
+  const [messages, setMessages] = useState(() => chatStorage.get(effectiveRoomId, effectiveUserId));
+  const [gameOverData, setGameOverData] = useState(null);
+
   const [whiteTimeLeft, setWhiteTimeLeft] = useState(600);
   const [blackTimeLeft, setBlackTimeLeft] = useState(600);
 
 
   useEffect(() => {
-    socket.on("gameOver", (data) => {
+    const handleGameOver = (data) => {
       console.log("Game over event received:", data);
       setGameOverData(data);
-      setStatus(data.status)
-    });
+      setStatus(data.status);
+    };
+
+    socket.on("gameOver", handleGameOver);
+
     return () => {
-      socket.off("gameOver");
+      socket.off("gameOver", handleGameOver);
     };
   }, []);
 
 
   const isBlack = playerColor === 'black';
-const [player1, setPlayer1] = useState({
-  name: "Opponent",
-  initialTime: isBlack ? blackTimeLeft : whiteTimeLeft,
-  isActive: currentPlayer !== playerColor
-});
+  const [player1, setPlayer1] = useState({
+    name: "Opponent",
+    initialTime: isBlack ? blackTimeLeft : whiteTimeLeft,
+    isActive: currentPlayer !== playerColor
+  });
 
-const [player2, setPlayer2] = useState({
-  name: "You",
-  initialTime: isBlack ? whiteTimeLeft : blackTimeLeft,
-  isActive: currentPlayer === playerColor
-});
+  const [player2, setPlayer2] = useState({
+    name: "You",
+    initialTime: isBlack ? whiteTimeLeft : blackTimeLeft,
+    isActive: currentPlayer === playerColor
+  });
 
   function speak(text) {
     const u = new SpeechSynthesisUtterance(text);
@@ -83,38 +105,36 @@ const [player2, setPlayer2] = useState({
   }
 
   useEffect(() => {
-    if (userId && roomId) {
+    if (effectiveUserId && effectiveRoomId) {
       console.log("Joining the room!");
-      socket.emit("joinRoom", { userId, roomId, color});
-      
+      socket.emit("joinRoom", { userId: effectiveUserId, roomId: effectiveRoomId, color: effectiveColor });
+
       const handleColorAssignment = (assignedColor) => {
         console.log(`Server assigned color: ${assignedColor}`);
         setPlayerColor(assignedColor);
       };
 
       socket.on("assignedColor", handleColorAssignment);
-      
+
       return () => {
         socket.off("assignedColor", handleColorAssignment);
       };
     }
-  }, [userId, roomId, color]);
+  }, [effectiveUserId, effectiveRoomId, effectiveColor]);
 
   useEffect(() => {
-    // ... all your existing socket.on listeners like "bothPlayersJoined", "Opponent Draw", etc.
-
     const handleOpponentDisconnected = () => {
-        toast.error("Your opponent has disconnected.");
-        setOpponentSocketId(null); // This is the crucial part!
-        // Optionally, you might want to reset other game state here
+      toast.error("Your opponent has disconnected.");
+      setOpponentSocketId(null);
+      setGameStarted(false);
     };
 
     socket.on("opponent-disconnected", handleOpponentDisconnected);
 
     return () => {
-        socket.off("opponent-disconnected", handleOpponentDisconnected);
+      socket.off("opponent-disconnected", handleOpponentDisconnected);
     };
-}, []);
+  }, []);
 
   useEffect(() => {
     const handleBothPlayersJoined = async ({ gameId, fen, moves, opponentSocketId, whiteTimeLeft, blackTimeLeft }) => {
@@ -122,47 +142,52 @@ const [player2, setPlayer2] = useState({
       setWhiteTimeLeft(whiteTimeLeft);
       setBlackTimeLeft(blackTimeLeft);
       if (playerColor === 'white') {
-    setPlayer2(prev => ({ ...prev, initialTime: whiteTimeLeft }));
-    setPlayer1(prev => ({ ...prev, initialTime: blackTimeLeft }));
-  } else {
-    setPlayer2(prev => ({ ...prev, initialTime: blackTimeLeft }));
-    setPlayer1(prev => ({ ...prev, initialTime: whiteTimeLeft }));
-  }
+        setPlayer2(prev => ({ ...prev, initialTime: whiteTimeLeft }));
+        setPlayer1(prev => ({ ...prev, initialTime: blackTimeLeft }));
+      } else {
+        setPlayer2(prev => ({ ...prev, initialTime: blackTimeLeft }));
+        setPlayer1(prev => ({ ...prev, initialTime: whiteTimeLeft }));
+      }
       setOpponentSocketId(opponentSocketId);
-      
+
       const { Chess } = await import("chess.js");
       const chess = new Chess(fen);
-       
+
       setGameState(chess);
       setMoves(moves || []);
-      
+
       const nextTurn = chess.turn() === 'w' ? 'white' : 'black';
       setCurrentPlayer(nextTurn);
-      
+
       setSession("gameId", gameId);
       setSession("fen", fen);
       setSession("moves", moves || []);
       setSession("currentPlayer", nextTurn);
       setSession("gameStarted", "true");
-      
+
       setgameId(gameId);
       setGameStarted(true);
     };
-    
+
+    const handleOpponentDraw = () => setDrawOfferVisible(true);
+    const handleOpponentResign = () => setStatus("win");
+    const handleDrawAccepted = () => setStatus("draw");
+    const handleDrawDeclined = () => toast.info("Opponent rejected your draw offer ❌");
+
     socket.on("bothPlayersJoined", handleBothPlayersJoined);
-    socket.on("Opponent Draw", () => setDrawOfferVisible(true));
-    socket.on("Opponent Resign", () => setStatus("win"));
-    socket.on("DrawAccepted", () => setStatus("draw"));
-    socket.on("DrawDeclined", () => toast.info("Opponent rejected your draw offer ❌"));
-    
+    socket.on("Opponent Draw", handleOpponentDraw);
+    socket.on("Opponent Resign", handleOpponentResign);
+    socket.on("DrawAccepted", handleDrawAccepted);
+    socket.on("DrawDeclined", handleDrawDeclined);
+
     return () => {
       socket.off("bothPlayersJoined", handleBothPlayersJoined);
-      socket.off("Opponent Draw");
-      socket.off("Opponent Resign");
-      socket.off("DrawAccepted");
-      socket.off("DrawDeclined");
+      socket.off("Opponent Draw", handleOpponentDraw);
+      socket.off("Opponent Resign", handleOpponentResign);
+      socket.off("DrawAccepted", handleDrawAccepted);
+      socket.off("DrawDeclined", handleDrawDeclined);
     };
-  }, []);
+  }, [playerColor]);
 
   useEffect(() => {
     const handleReceiveMessage = (serverMessage) => {
@@ -183,13 +208,13 @@ const [player2, setPlayer2] = useState({
     return () => {
       socket.off("ReceiveMessage", handleReceiveMessage);
     };
-  }, []);
+  }, [effectiveRoomId, effectiveUserId]);
 
   useEffect(() => {
-    const handleReceiveMove = async ({ move, fen, gameStatus, winner, allMoves }) => {
+    const handleReceiveMove = async ({ move, fen, gameStatus, winner, allMoves, whiteTimeLeft: sWhiteTime, blackTimeLeft: sBlackTime }) => {
       const pkg = await import("chess.js");
       const { Chess } = pkg;
-      const chess = new Chess(fen);
+      const chess = new Chess(fen); // Reconstruct from FEN to be sure
 
       setGameState(chess);
       setSession("fen", chess.fen());
@@ -197,24 +222,40 @@ const [player2, setPlayer2] = useState({
       setMoves(allMoves);
       setSession("moves", allMoves);
 
+      // --- TIME SYNC FIX ---
+      if (sWhiteTime !== undefined && sBlackTime !== undefined) {
+        setWhiteTimeLeft(sWhiteTime);
+        setBlackTimeLeft(sBlackTime);
+
+        if (playerColor === 'white') {
+          // I am White. Player 1 is Opponent (Black). Player 2 is Me (White).
+          setPlayer1(prev => ({ ...prev, initialTime: sBlackTime }));
+          setPlayer2(prev => ({ ...prev, initialTime: sWhiteTime }));
+        } else {
+          // I am Black. Player 1 is Opponent (White). Player 2 is Me (Black).
+          setPlayer1(prev => ({ ...prev, initialTime: sWhiteTime }));
+          setPlayer2(prev => ({ ...prev, initialTime: sBlackTime }));
+        }
+      }
+
       const nextPlayer = chess.turn() === 'w' ? 'white' : 'black';
       setCurrentPlayer(nextPlayer);
       setSession("currentPlayer", nextPlayer);
 
-      if (gameStatus === "drawn" || gameStatus === "finished") setStatus(true);
+      if (gameStatus === "drawn" || gameStatus === "finished") setStatus(winner ? (winner === effectiveUserId ? "win" : "lose") : "draw");
 
-      if (commentary === "hype") {
+      if (effectiveCommentary === "hype") {
         const lastMoves = allMoves.map(m => m.san || m);
         const prompt = {
           move: move.san,
           fen,
           lastMoves,
           isUserMove: false,
-          mode: commentary
+          mode: effectiveCommentary
         };
 
         try {
-          const res = await fetch("https://chesswithbenefits-server.onrender.com/api/commentary", {
+          const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/commentary`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ prompt })
@@ -228,12 +269,23 @@ const [player2, setPlayer2] = useState({
     };
 
     socket.on("receiveMove", handleReceiveMove);
-    return () => socket.off("receiveMove", handleReceiveMove);
-  }, [commentary, moves, userId]);
+
+    socket.on("moveRejected", (data) => {
+      console.error("Move rejected:", data);
+      toast.error(`Move rejected: ${data.error}. Resyncing...`);
+      // Force reload to sync state
+      window.location.reload();
+    });
+
+    return () => {
+      socket.off("receiveMove", handleReceiveMove);
+      socket.off("moveRejected");
+    };
+  }, [effectiveCommentary, moves, effectiveUserId]);
 
   const handleMove = async (move, updatedGame) => {
     const currentGameId = getSession("gameId") || gameId;
-    socket.emit("SendMove", { move, gameId:currentGameId, userId, roomId });
+    socket.emit("SendMove", { move, gameId: currentGameId, userId: effectiveUserId, roomId: effectiveRoomId });
     const newMoves = [...moves, move.san];
     setSession("moves", newMoves);
     setMoves(newMoves);
@@ -245,17 +297,17 @@ const [player2, setPlayer2] = useState({
     setCurrentPlayer(nextPlayer);
     setSession("currentPlayer", nextPlayer);
 
-    if (commentary !== "off") {
+    if (effectiveCommentary !== "off") {
       const prompt = {
         move: move.san,
         fen: updatedGame.fen(),
         lastMoves: newMoves,
         isUserMove: true,
-        mode: commentary
+        mode: effectiveCommentary
       };
 
       try {
-        const res = await fetch("https://chesswithbenefits-server.onrender.com/api/commentary", {
+        const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/commentary`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt })
@@ -269,27 +321,45 @@ const [player2, setPlayer2] = useState({
   };
 
   const handleSendMessage = (message) => {
-    chatStorage.add(roomId, userId, message);
+    chatStorage.add(effectiveRoomId, effectiveUserId, message);
     setMessages(prevMessages => [...prevMessages, message]);
   };
 
-  const handleDraw = () => socket.emit("Draw", { roomId });
+  const handleDraw = () => {
+    console.log("🤝 handleDraw Triggered");
+    console.log("Value check:", { effectiveRoomId });
+    if (!effectiveRoomId) {
+      toast.error("Error: Room ID invalid. Cannot offer draw.");
+      return;
+    }
+    socket.emit("Draw", { roomId: effectiveRoomId });
+    toast.info("Draw offer sent! Waiting for opponent...");
+  };
 
   const handleResign = () => {
-    setStatus("lose");
+    console.log("🏳️ handleResign Triggered");
     const currentGameId = getSession("gameId") || gameId;
-    socket.emit("Resign", { roomId, gameId:currentGameId, userId });
+    console.log("Value check:", { effectiveRoomId, currentGameId, effectiveUserId });
+
+    if (!effectiveRoomId || !currentGameId || !effectiveUserId) {
+      console.error("Missing critical data for resign:", { effectiveRoomId, currentGameId, effectiveUserId });
+      toast.error("Error: Game data missing. Cannot resign.");
+      return;
+    }
+
+    setStatus("lose");
+    socket.emit("Resign", { roomId: effectiveRoomId, gameId: currentGameId, userId: effectiveUserId });
   };
 
   const acceptDraw = () => {
     const currentGameId = getSession("gameId") || gameId;
-    socket.emit("DrawAccepted", { roomId, gameId:currentGameId });
+    socket.emit("DrawAccepted", { roomId: effectiveRoomId, gameId: currentGameId });
     setDrawOfferVisible(false);
     setStatus("draw");
   };
 
   const declineDraw = () => {
-    socket.emit("DrawDeclined", { roomId });
+    socket.emit("DrawDeclined", { roomId: effectiveRoomId });
     setDrawOfferVisible(false);
   };
 
@@ -298,15 +368,15 @@ const [player2, setPlayer2] = useState({
       {!isMobile && (
         <div className="grid grid-cols-4 gap-4 max-w-6xl mx-auto">
           <div className="space-y-4">
-           <PlayerCard
-  key={'opponent-card'} 
-  playerName={player1.name}
-  initialTime={player1.initialTime}
-  isActive={player1.isActive}
-  isCurrentUser={false}
-  color={playerColor === 'white' ? 'black' : 'white'}
-  opponentSocketId={opponentSocketId}
-/>
+            <PlayerCard
+              key={'opponent-card'}
+              playerName={player1.name}
+              initialTime={player1.initialTime}
+              isActive={player1.isActive}
+              isCurrentUser={false}
+              color={playerColor === 'white' ? 'black' : 'white'}
+              opponentSocketId={opponentSocketId}
+            />
             <MoveHistory moves={moves} className="h-80" />
           </div>
           <div className="col-span-2 min-h-[500px]">
@@ -316,28 +386,28 @@ const [player2, setPlayer2] = useState({
               onMove={handleMove}
               gameState={gameState}
               status={status}
-              mode={mode}
-              handleDraw={handleDraw}
-              handleResign={handleResign}
               gameStarted={gameStarted}
               currentPlayer={currentPlayer}
+              mode={effectiveMode}
+              handleDraw={handleDraw}
+              handleResign={handleResign}
             />
           </div>
           <div className="space-y-4">
             <PlayerCard
-  key={`player2-${userId}`}
-  playerName={player2.name}
-  initialTime={player2.initialTime}
-  isActive={player2.isActive}
-  isCurrentUser={true}
-  color={playerColor}
-  opponentSocketId={opponentSocketId}
-/>
+              key={`player2-${effectiveUserId}`}
+              playerName={player2.name}
+              initialTime={player2.initialTime}
+              isActive={player2.isActive}
+              isCurrentUser={true}
+              color={playerColor}
+              opponentSocketId={opponentSocketId}
+            />
             <Chat
               className="h-80"
               messages={messages}
               onSendMessage={handleSendMessage}
-              roomId={roomId}
+              roomId={effectiveRoomId}
             />
           </div>
         </div>
@@ -346,26 +416,26 @@ const [player2, setPlayer2] = useState({
       {isMobile && (
         <div className="w-full max-w-[400px] mx-auto space-y-3 px-2">
           <div className="grid grid-cols-2 gap-2">
-           <PlayerCard
-  key={`mobile-player1-${opponentSocketId || 'waiting'}`}
-  playerName={player1.name}
-  initialTime={player1.initialTime}
-  isActive={player1.isActive}
-  className="h-44"
-  isCurrentUser={false}
-  color={playerColor === 'white' ? 'black' : 'white'}
-  opponentSocketId={opponentSocketId}
-/>
-<PlayerCard
-  key={`mobile-player2-${userId}`}
-  playerName={player2.name}
-  initialTime={player2.initialTime}
-  isActive={player2.isActive}
-  color={playerColor}
-  className="h-44"
-  isCurrentUser={true}
-  opponentSocketId={opponentSocketId}
-/>
+            <PlayerCard
+              key={`mobile-player1-${opponentSocketId || 'waiting'}`}
+              playerName={player1.name}
+              initialTime={player1.initialTime}
+              isActive={player1.isActive}
+              className="h-44"
+              isCurrentUser={false}
+              color={playerColor === 'white' ? 'black' : 'white'}
+              opponentSocketId={opponentSocketId}
+            />
+            <PlayerCard
+              key={`mobile-player2-${effectiveUserId}`}
+              playerName={player2.name}
+              initialTime={player2.initialTime}
+              isActive={player2.isActive}
+              color={playerColor}
+              className="h-44"
+              isCurrentUser={true}
+              opponentSocketId={opponentSocketId}
+            />
           </div>
           <div className="h-[450px] w-full">
             <ChessBoard
@@ -395,7 +465,7 @@ const [player2, setPlayer2] = useState({
             </div>
           </MobilePanel>
           <MobilePanel isOpen={showChat} onClose={() => setShowChat(false)} title="Chat">
-            <Chat className="h-full border-0 shadow-none rounded-none max-h-[60vh] overflow-y-auto" messages={messages} onSendMessage={handleSendMessage} roomId={roomId} />
+            <Chat className="h-full border-0 shadow-none rounded-none max-h-[60vh] overflow-y-auto" messages={messages} onSendMessage={handleSendMessage} roomId={effectiveRoomId} />
           </MobilePanel>
         </div>
       )}
@@ -423,7 +493,7 @@ const [player2, setPlayer2] = useState({
               <button onClick={() => {
                 setStatus("lose");
                 const currentGameId = getSession("gameId") || gameId;
-                socket.emit("Resign", { roomId, gameId:currentGameId, userId });
+                socket.emit("Resign", { roomId: effectiveRoomId, gameId: currentGameId, userId: effectiveUserId });
                 setShowBackWarning(false);
               }} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">🔚 Finish Game</button>
             </div>

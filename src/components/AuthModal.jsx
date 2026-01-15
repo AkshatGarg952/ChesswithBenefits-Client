@@ -3,7 +3,7 @@ import { X, Eye, EyeOff, Mail, Lock, User, Crown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -19,35 +19,35 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
     e.preventDefault();
     setIsLoading(true);
 
-     try {
-    const response = await fetch(
-      mode === 'login' ? 'https://chesswithbenefits-server.onrender.com/api/users/login' : 'https://chesswithbenefits-server.onrender.com/api/users/register',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      }
-    );
+    try {
+      const response = await fetch(
+        mode === 'login' ? `${import.meta.env.VITE_SERVER_URL}/api/users/login` : `${import.meta.env.VITE_SERVER_URL}/api/users/register`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        }
+      );
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Something went wrong');
-    const {user, token} = data;
-    sessionStorage.setItem('token', token);
-    sessionStorage.setItem('user', user._id);
-    onSuccess(user);
-    navigate(`/dashboard`);
-  } catch (error) {
-    alert(error.message);
-  }
-    
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Something went wrong');
+      const { user, token } = data;
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', user._id);
+      onSuccess(user);
+      navigate(`/dashboard`);
+    } catch (error) {
+      alert(error.message);
+    }
+
     setTimeout(() => {
       setIsLoading(false);
       onSuccess();
     }, 1500);
   };
-  
+
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
@@ -149,9 +149,9 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
               </div>
             </div>
 
-            
 
-            
+
+
 
             <button
               type="submit"

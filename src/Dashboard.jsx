@@ -194,7 +194,7 @@ const ChessDashboard = () => {
             <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 bg-gradient-to-br from-primary-600 to-accent-600 rounded-xl flex items-center justify-center shadow-glow-sm">
               <span className="text-white font-bold text-base sm:text-lg md:text-xl">♔</span>
             </div>
-            <span className="text-lg sm:text-xl md:text-2xl font-display font-bold gradient-text">ChessConnect</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-display font-bold gradient-text">Chess with Benefits</span>
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">

@@ -33,9 +33,8 @@ const VideoCall = ({
 
   return (
     <div
-      className={`relative w-full h-full rounded-lg lg:rounded-xl overflow-hidden transition-all duration-300 ${
-        isActive ? 'ring-2 ring-orange-200' : ''
-      }`}
+      className={`relative w-full h-full rounded-lg lg:rounded-xl overflow-hidden transition-all duration-300 ${isActive ? 'ring-2 ring-orange-200' : ''
+        }`}
     >
       <video
         ref={videoRef}
@@ -50,7 +49,7 @@ const VideoCall = ({
           onClick={onCallUser}
           className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-3 py-1 rounded-md shadow-md"
         >
-          📞 Call Other Player
+          Call Other Player
         </button>
       )}
     </div>

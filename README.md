@@ -1,27 +1,42 @@
-# Chess with Benefits - Frontend
+# Chess with Benefits - Client
 
-Chess with Benefits is an innovative chess platform that transforms traditional chess gameplay into an immersive, interactive experience. Featuring real-time video calls, AI-powered commentary, voice commands, and comprehensive game analytics—all while maintaining the classic chess experience.
+A modern chess platform that combines traditional chess gameplay with real-time video calls, AI-powered commentary, voice commands, and comprehensive game analytics. Built with React and Vite for a fast and responsive user experience.
 
 ## Features
 
-* **Video Call Integration**: Play chess face-to-face with opponents through integrated WebRTC video calling for a more personal gaming experience.
-* **AI Commentary Modes**: Choose from three unique commentary styles:
-  * **Roast Mode**: Humorous, witty commentary that playfully critiques your moves
-  * **Hype Mode**: Energetic, encouraging commentary that celebrates every play
-  * **Beginner Mode**: Educational commentary explaining strategies and techniques
-* **Voice Commands**: Move pieces hands-free using natural voice commands for an accessible gaming experience.
-* **Real-time Chat**: Communicate with your opponent through instant messaging during matches.
-* **Move Analysis**: Powered by Stockfish engine to analyze and categorize every move with professional-grade insights.
-* **Comprehensive Dashboard**: Track your progress with detailed statistics, match history, and performance metrics across all games.
-* **Real-time Gameplay**: Seamless synchronization ensures smooth, lag-free chess matches.
+- Real-time multiplayer chess with instant move synchronization
+- Integrated video calling for face-to-face gameplay
+- AI commentary system with three distinct modes:
+  - Roast Mode: Humorous and witty commentary
+  - Hype Mode: Enthusiastic and encouraging feedback
+  - Beginner Mode: Educational explanations and strategy tips
+- Voice command support for hands-free chess moves
+- Live chat messaging during matches
+- Move analysis powered by Stockfish engine
+- Comprehensive dashboard with statistics and match history
+- Responsive design with smooth animations
+- Modern UI with Tailwind CSS styling
 
-## Demo
+## Tech Stack
 
-* Live Website: [Chess with Benefits](https://your-frontend-url.com)
+| Component | Technology |
+|-----------|-----------|
+| Framework | React 18 |
+| Build Tool | Vite |
+| Routing | React Router DOM |
+| Styling | Tailwind CSS |
+| Chess Logic | Chess.js |
+| Chess Board | React Chessboard |
+| Real-time Communication | Socket.io Client |
+| Animations | Framer Motion |
+| Charts | Recharts |
+| HTTP Client | Axios |
+| Voice Recognition | Web Speech API, Mic Recorder |
+| UI Components | Lucide React (icons) |
+| Celebrations | React Confetti |
+| Notifications | React Toastify |
 
 ## Installation
-
-To run Chess with Benefits frontend locally, follow these steps:
 
 1. Clone the repository:
 
@@ -34,46 +49,24 @@ cd ChesswithBenefits-Client
 
 ```bash
 npm install
-# or
-yarn install
-# or
-pnpm install
 ```
 
-3. Set Up Environment Variables
+3. Set up environment variables:
 
-Create a `.env.local` file in the root directory using the provided `.env.example`:
+Create a `.env` file in the root directory based on `.env.example`:
 
 ```env
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000
-NEXT_PUBLIC_WEBRTC_SIGNALING_URL=http://localhost:8000
+# Server Configuration
+VITE_SERVER_URL=http://localhost:3000
 ```
 
-4. Run the development server:
+4. Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
-
-## Tech Stack
-
-| Component | Tools & Technologies |
-|-----------|---------------------|
-| **Frontend Framework** | Next.js, React, TypeScript |
-| **Chess Logic** | Chess.js |
-| **Video Calling** | WebRTC, Socket.io |
-| **Voice Recognition** | Web Speech API |
-| **Styling** | Tailwind CSS / Material-UI |
-| **State Management** | Redux / Zustand |
-| **Real-time Communication** | Socket.io Client |
-| **Deployment** | Vercel |
+5. Open your browser and navigate to `http://localhost:5173`
 
 ## Project Structure
 
@@ -81,53 +74,134 @@ pnpm dev
 ChesswithBenefits-Client/
 ├── src/
 │   ├── components/
-│   │   ├── Chess/
-│   │   ├── VideoCall/
-│   │   ├── Commentary/
-│   │   ├── Chat/
-│   │   └── Dashboard/
+│   │   ├── AICommentary.jsx
+│   │   ├── AuthModal.jsx
+│   │   ├── CallToAction.jsx
+│   │   ├── Chat.jsx
+│   │   ├── ChessBoard.jsx
+│   │   ├── ChessGame.jsx
+│   │   ├── Features.jsx
+│   │   ├── Footer.jsx
+│   │   ├── Hero.jsx
+│   │   ├── HowItWorks.jsx
+│   │   ├── MobilePanel.jsx
+│   │   ├── MoveAnalysis.jsx
+│   │   ├── MoveHistory.jsx
+│   │   ├── Navbar.jsx
+│   │   ├── Testimonials.jsx
+│   │   └── VideoCall.jsx
 │   ├── hooks/
+│   ├── socket/
+│   ├── storage/
 │   ├── utils/
-│   ├── context/
-│   └── pages/
+│   ├── App.jsx
+│   ├── Authcontext.jsx
+│   ├── Dashboard.jsx
+│   ├── LandPage2.jsx
+│   ├── index.css
+│   └── main.jsx
 ├── public/
+├── index.html
+├── vite.config.ts
+├── tailwind.config.js
 └── package.json
 ```
 
-## Key Features Implementation
+## Available Scripts
 
-### Chess Board
-Custom chess board implementation with drag-and-drop functionality, move validation, and visual indicators for legal moves.
+```bash
+# Start development server
+npm run dev
 
-### Commentary System
-Real-time AI commentary that analyzes each move and provides contextual feedback based on the selected mode (Roast, Hype, or Beginner).
+# Build for production
+npm run build
 
-### Voice Commands
-Natural language processing for chess move commands like "Knight to E4" or "Castle kingside" using the Web Speech API.
+# Preview production build
+npm run preview
 
-### Dashboard Analytics
-Comprehensive statistics dashboard displaying:
+# Run linter
+npm run lint
+```
+
+## Key Components
+
+### ChessBoard
+Interactive chess board with drag-and-drop functionality, move validation, legal move highlighting, and piece animations.
+
+### ChessGame
+Main game component managing game state, player connections, move handling, and real-time synchronization.
+
+### AICommentary
+Real-time AI commentary system that analyzes moves and provides contextual feedback based on selected mode (Roast, Hype, or Beginner).
+
+### VideoCall
+WebRTC-based video calling component enabling face-to-face gameplay between opponents.
+
+### Dashboard
+Comprehensive analytics dashboard displaying:
 - Total matches played
-- Win/Loss/Draw ratios
-- Move accuracy percentages
-- Opening repertoire analysis
-- Time management statistics
+- Win, loss, and draw statistics
+- Move accuracy metrics
+- Match history
+- Performance trends
+- Time management analysis
+
+### MoveAnalysis
+Displays detailed analysis of chess moves including quality assessment, evaluation scores, and strategic insights.
+
+### Chat
+Real-time messaging component for communication between players during matches.
+
+## Voice Commands
+
+The application supports natural language voice commands for chess moves:
+
+- Standard notation: "Knight to E4"
+- Castle moves: "Castle kingside" or "Castle queenside"
+- Pawn moves: "Pawn to D4"
+- Captures: "Bishop takes E5"
+
+## Environment Configuration
+
+The client connects to the backend server using the URL specified in the `VITE_SERVER_URL` environment variable. Make sure this matches your server configuration.
+
+## Build and Deployment
+
+To build the application for production:
+
+```bash
+npm run build
+```
+
+The build output will be in the `dist` directory, ready for deployment to any static hosting service.
+
+## Browser Compatibility
+
+The application works best on modern browsers with WebRTC and Web Speech API support:
+- Chrome (recommended)
+- Firefox
+- Edge
+- Safari (limited voice command support)
 
 ## Related Repositories
 
-* Backend Server: [ChesswithBenefits-Server](https://github.com/AkshatGarg952/ChesswithBenefits-Server)
+- Backend Server: [ChesswithBenefits-Server](https://github.com/AkshatGarg952/ChesswithBenefits-Server)
+
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ## Contact
 
-For any questions or suggestions, feel free to reach out:
-
-* GitHub: [@AkshatGarg952](https://github.com/AkshatGarg952)
-* Email: gargakshat952@gmail.com
-
----
-
-Built with ♟️ by passionate chess enthusiasts
+- GitHub: [@AkshatGarg952](https://github.com/AkshatGarg952)
+- Email: gargakshat952@gmail.com

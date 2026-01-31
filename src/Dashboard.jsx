@@ -188,55 +188,55 @@ const ChessDashboard = () => {
 
   const renderNavbar = () => (
     <nav className="glass border-b border-white/20 shadow-glass">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex justify-between items-center h-16 sm:h-18">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-primary-600 to-accent-600 rounded-xl flex items-center justify-center shadow-glow-sm">
-              <span className="text-white font-bold text-lg sm:text-xl">♔</span>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6">
+        <div className="flex justify-between items-center h-14 sm:h-16 md:h-18">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 bg-gradient-to-br from-primary-600 to-accent-600 rounded-xl flex items-center justify-center shadow-glow-sm">
+              <span className="text-white font-bold text-base sm:text-lg md:text-xl">♔</span>
             </div>
-            <span className="text-xl sm:text-2xl font-display font-bold gradient-text">ChessConnect</span>
+            <span className="text-lg sm:text-xl md:text-2xl font-display font-bold gradient-text">ChessConnect</span>
           </div>
 
-          <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-xl transition-all duration-300 ${currentView === 'dashboard'
+              className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 rounded-xl transition-all duration-300 min-h-[44px] ${currentView === 'dashboard'
                 ? 'bg-primary-100 text-primary-700 shadow-inner'
                 : 'text-gray-700 hover:bg-white/50'
                 }`}
             >
               <Home size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium">Dashboard</span>
+              <span className="hidden sm:inline font-medium text-sm md:text-base">Dashboard</span>
             </button>
 
             <button
               onClick={() => setCurrentView('create')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-xl transition-all duration-300 ${currentView === 'create'
+              className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 rounded-xl transition-all duration-300 min-h-[44px] ${currentView === 'create'
                 ? 'bg-primary-100 text-primary-700 shadow-inner'
                 : 'text-gray-700 hover:bg-white/50'
                 }`}
             >
               <Plus size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium">Create</span>
+              <span className="hidden sm:inline font-medium text-sm md:text-base">Create</span>
             </button>
 
             <button
               onClick={() => setCurrentView('join')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-xl transition-all duration-300 ${currentView === 'join'
+              className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 rounded-xl transition-all duration-300 min-h-[44px] ${currentView === 'join'
                 ? 'bg-primary-100 text-primary-700 shadow-inner'
                 : 'text-gray-700 hover:bg-white/50'
                 }`}
             >
               <Users size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium">Join</span>
+              <span className="hidden sm:inline font-medium text-sm md:text-base">Join</span>
             </button>
 
             <button
               onClick={handlePlayClick}
-              className="flex items-center space-x-2 px-3 sm:px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300"
+              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 min-h-[44px]"
             >
               <LogOut size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium">Logout</span>
+              <span className="hidden sm:inline font-medium text-sm md:text-base">Logout</span>
             </button>
           </div>
         </div>
@@ -268,51 +268,51 @@ const ChessDashboard = () => {
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div className="card-glass border-l-4 border-primary-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
+            <div className="card-glass border-l-4 border-primary-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Games</p>
-                  <p className="text-3xl font-display font-bold gradient-text-purple">{totalGames}</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Games</p>
+                  <p className="text-2xl sm:text-3xl font-display font-bold gradient-text-purple">{totalGames}</p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl">
-                  <Trophy className="h-6 w-6 text-primary-600" />
+                <div className="p-2 sm:p-3 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl">
+                  <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" />
                 </div>
               </div>
             </div>
 
-            <div className="card-glass border-l-4 border-success-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-100">
+            <div className="card-glass border-l-4 border-success-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-100 p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Win Rate</p>
-                  <p className="text-3xl font-display font-bold bg-gradient-to-r from-success-600 to-success-400 bg-clip-text text-transparent">{winRate}%</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Win Rate</p>
+                  <p className="text-2xl sm:text-3xl font-display font-bold bg-gradient-to-r from-success-600 to-success-400 bg-clip-text text-transparent">{winRate}%</p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-success-100 to-success-200 rounded-xl">
-                  <TrendingUp className="h-6 w-6 text-success-600" />
+                <div className="p-2 sm:p-3 bg-gradient-to-br from-success-100 to-success-200 rounded-xl">
+                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-success-600" />
                 </div>
               </div>
             </div>
 
-            <div className="card-glass border-l-4 border-info-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-200">
+            <div className="card-glass border-l-4 border-info-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-200 p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Moves</p>
-                  <p className="text-3xl font-display font-bold bg-gradient-to-r from-info-600 to-info-400 bg-clip-text text-transparent">{totalMoves}</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Moves</p>
+                  <p className="text-2xl sm:text-3xl font-display font-bold bg-gradient-to-r from-info-600 to-info-400 bg-clip-text text-transparent">{totalMoves}</p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-info-100 to-info-200 rounded-xl">
-                  <Target className="h-6 w-6 text-info-600" />
+                <div className="p-2 sm:p-3 bg-gradient-to-br from-info-100 to-info-200 rounded-xl">
+                  <Target className="h-5 w-5 sm:h-6 sm:w-6 text-info-600" />
                 </div>
               </div>
             </div>
 
-            <div className="card-glass border-l-4 border-accent-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-300">
+            <div className="card-glass border-l-4 border-accent-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-300 p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Best Moves</p>
-                  <p className="text-3xl font-display font-bold gradient-text-orange">{bestMoves}</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Best Moves</p>
+                  <p className="text-2xl sm:text-3xl font-display font-bold gradient-text-orange">{bestMoves}</p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl">
-                  <Zap className="h-6 w-6 text-accent-600" />
+                <div className="p-2 sm:p-3 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl">
+                  <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-accent-600" />
                 </div>
               </div>
             </div>
@@ -321,34 +321,34 @@ const ChessDashboard = () => {
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Game Statistics */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-800">Game Results</h3>
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800">Game Results</h3>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => setGameChartType('pie')}
-                    className={`p-2 rounded-lg ${gameChartType === 'pie'
+                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${gameChartType === 'pie'
                       ? 'bg-orange-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
                       }`}
                   >
-                    <Circle size={20} />
+                    <Circle size={18} className="sm:w-5 sm:h-5" />
                   </button>
                   <button
                     onClick={() => setGameChartType('bar')}
-                    className={`p-2 rounded-lg ${gameChartType === 'bar'
+                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${gameChartType === 'bar'
                       ? 'bg-orange-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
                       }`}
                   >
-                    <BarChart3 size={20} />
+                    <BarChart3 size={18} className="sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="h-80">
+              <div className="h-64 sm:h-80">
                 {totalGames === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-600 text-lg">
+                  <div className="flex items-center justify-center h-full text-gray-600 text-sm sm:text-base md:text-lg">
                     Sorry, you have not played any games yet.
                   </div>
                 ) : (
@@ -396,34 +396,34 @@ const ChessDashboard = () => {
             </div>
 
             {/* Move Quality */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-800">Move Quality</h3>
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800">Move Quality</h3>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => setMoveChartType('pie')}
-                    className={`p-2 rounded-lg ${moveChartType === 'pie'
+                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${moveChartType === 'pie'
                       ? 'bg-orange-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
                       }`}
                   >
-                    <Circle size={20} />
+                    <Circle size={18} className="sm:w-5 sm:h-5" />
                   </button>
                   <button
                     onClick={() => setMoveChartType('bar')}
-                    className={`p-2 rounded-lg ${moveChartType === 'bar'
+                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${moveChartType === 'bar'
                       ? 'bg-orange-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
                       }`}
                   >
-                    <BarChart3 size={20} />
+                    <BarChart3 size={18} className="sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
 
-              <div className="h-80">
+              <div className="h-64 sm:h-80">
                 {totalMoves === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-600 text-lg">
+                  <div className="flex items-center justify-center h-full text-gray-600 text-sm sm:text-base md:text-lg">
                     Sorry, you have not made any moves yet.
                   </div>
                 ) : (

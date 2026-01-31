@@ -8,7 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Rehydrate user if token exists in sessionStorage
+  // Rehydrate user if token exists in sessionStorage
   useEffect(() => {
     const fetchUser = async () => {
       const storedToken = sessionStorage.getItem('token');
@@ -39,14 +39,14 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, []);
 
-  // ✅ Login stores token in sessionStorage and state
+  // Login stores token in sessionStorage and state
   const login = (newToken, userData) => {
     sessionStorage.setItem('token', newToken);
     setToken(newToken);
     setUser(userData);
   };
 
-  // ✅ Logout clears both sessionStorage and state
+  // Logout clears both sessionStorage and state
   const logout = () => {
     sessionStorage.removeItem('token');
     setToken(null);

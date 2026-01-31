@@ -1,540 +1,540 @@
-// src/hooks/useWebRTC.js
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { toast } from 'react-toastify';
+﻿//src/hooks/useWebRTC.js
+import{useState,useEffect,useRef,useCallback}from'react';
+import{toast}from'react-toastify';
 
-// ICE server configuration for STUN
-const ICE_SERVERS = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-    ],
+//ICEserverconfigurationforSTUN
+constICE_SERVERS={
+iceServers:[
+{urls:'stun:stun.l.google.com:19302'},
+{urls:'stun:stun1.l.google.com:19302'},
+{urls:'stun:stun2.l.google.com:19302'},
+],
 };
 
-// Media constraints for video and audio
-const MEDIA_CONSTRAINTS = {
-    video: { 
-        width: { ideal: 640, max: 1280 }, 
-        height: { ideal: 480, max: 720 },
-        frameRate: { ideal: 30, max: 30 }
-    },
-    audio: { 
-        echoCancellation: true, 
-        noiseSuppression: true,
-        autoGainControl: true
-    },
+//Mediaconstraintsforvideoandaudio
+constMEDIA_CONSTRAINTS={
+video:{
+width:{ideal:640,max:1280},
+height:{ideal:480,max:720},
+frameRate:{ideal:30,max:30}
+},
+audio:{
+echoCancellation:true,
+noiseSuppression:true,
+autoGainControl:true
+},
 };
 
-export const useWebRTC = ({ socket, opponentSocketId, isCurrentUser }) => {
-    // State management
-    const [connectionState, setConnectionState] = useState('idle');
-    const [mediaError, setMediaError] = useState(null);
-    const [isMicEnabled, setMicEnabled] = useState(true);
-    const [isVideoEnabled, setVideoEnabled] = useState(true);
-    const [shouldInitiateCall, setShouldInitiateCall] = useState(false);
+exportconstuseWebRTC=({socket,opponentSocketId,isCurrentUser})=>{
+//Statemanagement
+const[connectionState,setConnectionState]=useState('idle');
+const[mediaError,setMediaError]=useState(null);
+const[isMicEnabled,setMicEnabled]=useState(true);
+const[isVideoEnabled,setVideoEnabled]=useState(true);
+const[shouldInitiateCall,setShouldInitiateCall]=useState(false);
 
-    // Refs for WebRTC components
-    const peerConnectionRef = useRef(null);
-    const localStreamRef = useRef(null);
-    const remoteStreamRef = useRef(null);
-    const pendingCandidatesRef = useRef([]);
-    const pendingAnswersRef = useRef([]); // For queuing answers if needed
-    const hasInitializedRef = useRef(false);
-    const isInitializingRef = useRef(false);
-    const callStateRef = useRef('idle');
-    const myRoleRef = useRef(null); // 'caller' or 'receiver'
-    const isProcessingOfferRef = useRef(false);
-    const isProcessingAnswerRef = useRef(false);
+//RefsforWebRTCcomponents
+constpeerConnectionRef=useRef(null);
+constlocalStreamRef=useRef(null);
+constremoteStreamRef=useRef(null);
+constpendingCandidatesRef=useRef([]);
+constpendingAnswersRef=useRef([]);//Forqueuinganswersifneeded
+consthasInitializedRef=useRef(false);
+constisInitializingRef=useRef(false);
+constcallStateRef=useRef('idle');
+constmyRoleRef=useRef(null);//'caller'or'receiver'
+constisProcessingOfferRef=useRef(false);
+constisProcessingAnswerRef=useRef(false);
 
-    // Debug function to log peer connection details
-    const debugPeerConnection = useCallback(() => {
-        const pc = peerConnectionRef.current;
-        if (pc) {
-            console.log(`🔍 PC Debug Info:`, {
-                signalingState: pc.signalingState,
-                connectionState: pc.connectionState,
-                iceConnectionState: pc.iceConnectionState,
-                iceGatheringState: pc.iceGatheringState,
-                localDescription: pc.localDescription?.type,
-                remoteDescription: pc.remoteDescription?.type,
-                callState: callStateRef.current,
-                role: myRoleRef.current,
-                createdAt: pc._createdAt,
-                currentTime: Date.now(),
-                isCurrentUser
-            });
-        } else {
-            console.log(`🔍 No peer connection exists (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-        }
-    }, [isCurrentUser]);
+//Debugfunctiontologpeerconnectiondetails
+constdebugPeerConnection=useCallback(()=>{
+constpc=peerConnectionRef.current;
+if(pc){
+console.log(`PCDebugInfo:`,{
+signalingState:pc.signalingState,
+connectionState:pc.connectionState,
+iceConnectionState:pc.iceConnectionState,
+iceGatheringState:pc.iceGatheringState,
+localDescription:pc.localDescription?.type,
+remoteDescription:pc.remoteDescription?.type,
+callState:callStateRef.current,
+role:myRoleRef.current,
+createdAt:pc._createdAt,
+currentTime:Date.now(),
+isCurrentUser
+});
+}else{
+console.log(`Nopeerconnectionexists(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}
+},[isCurrentUser]);
 
-    // Cleanup function to reset everything
-    const cleanup = useCallback(() => {
-        console.log(`🧹 Cleaning up WebRTC resources... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-        
-        if (peerConnectionRef.current) {
-            peerConnectionRef.current.onicecandidate = null;
-            peerConnectionRef.current.ontrack = null;
-            peerConnectionRef.current.onconnectionstatechange = null;
-            peerConnectionRef.current.onnegotiationneeded = null;
-            peerConnectionRef.current.onsignalingstatechange = null;
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-        }
+//Cleanupfunctiontoreseteverything
+constcleanup=useCallback(()=>{
+console.log(`CleaningupWebRTCresources...(${isCurrentUser?'CurrentUser':'Opponent'})`);
 
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
-            localStreamRef.current = null;
-        }
+if(peerConnectionRef.current){
+peerConnectionRef.current.onicecandidate=null;
+peerConnectionRef.current.ontrack=null;
+peerConnectionRef.current.onconnectionstatechange=null;
+peerConnectionRef.current.onnegotiationneeded=null;
+peerConnectionRef.current.onsignalingstatechange=null;
+peerConnectionRef.current.close();
+peerConnectionRef.current=null;
+}
 
-        remoteStreamRef.current = null;
-        pendingCandidatesRef.current = [];
-        pendingAnswersRef.current = [];
-        hasInitializedRef.current = false;
-        isInitializingRef.current = false;
-        callStateRef.current = 'idle';
-        myRoleRef.current = null;
-        isProcessingOfferRef.current = false;
-        isProcessingAnswerRef.current = false;
-        setShouldInitiateCall(false);
-        
-        setConnectionState('idle');
-        setMediaError(null);
-    }, [isCurrentUser]);
+if(localStreamRef.current){
+localStreamRef.current.getTracks().forEach(track=>track.stop());
+localStreamRef.current=null;
+}
 
-    // Get user media (camera and mic)
-    const initializeMedia = useCallback(async () => {
-        if (localStreamRef.current) return true;
+remoteStreamRef.current=null;
+pendingCandidatesRef.current=[];
+pendingAnswersRef.current=[];
+hasInitializedRef.current=false;
+isInitializingRef.current=false;
+callStateRef.current='idle';
+myRoleRef.current=null;
+isProcessingOfferRef.current=false;
+isProcessingAnswerRef.current=false;
+setShouldInitiateCall(false);
 
-        try {
-            console.log(`🎥 Requesting user media... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            setConnectionState('requesting-media');
-            
-            const stream = await navigator.mediaDevices.getUserMedia(MEDIA_CONSTRAINTS);
-            localStreamRef.current = stream;
-            
-            stream.getVideoTracks().forEach(track => {
-                track.enabled = isVideoEnabled;
-            });
-            stream.getAudioTracks().forEach(track => {
-                track.enabled = isMicEnabled;
-            });
+setConnectionState('idle');
+setMediaError(null);
+},[isCurrentUser]);
 
-            setMediaError(null);
-            console.log(`✅ User media obtained successfully (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            return true;
-        } catch (err) {
-            console.error(`❌ Failed to get user media (${isCurrentUser ? 'Current User' : 'Opponent'}):`, err);
-            let errorMessage = 'Could not access camera/microphone';
-            
-            switch (err.name) {
-                case 'NotAllowedError':
-                    errorMessage = 'Camera/microphone access denied';
-                    break;
-                case 'NotFoundError':
-                    errorMessage = 'No camera/microphone found';
-                    break;
-                case 'NotReadableError':
-                    errorMessage = 'Camera/microphone is being used by another application';
-                    break;
-            }
-            
-            setMediaError(errorMessage);
-            toast.error(errorMessage);
-            return false;
-        }
-    }, [isVideoEnabled, isMicEnabled, isCurrentUser]);
+//Getusermedia(cameraandmic)
+constinitializeMedia=useCallback(async()=>{
+if(localStreamRef.current)returntrue;
 
-    // Create peer connection with safeguards
-    const createPeerConnection = useCallback((role) => {
-        if (peerConnectionRef.current && peerConnectionRef.current.signalingState !== 'closed') {
-            console.log(`⚠️ Peer connection already exists and not closed, reusing existing one (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            return peerConnectionRef.current;
-        }
+try{
+console.log(`Requestingusermedia...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+setConnectionState('requesting-media');
 
-        console.log(`🔗 Creating new peer connection as ${role}... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-        const pc = new RTCPeerConnection(ICE_SERVERS);
-        peerConnectionRef.current = pc;
-        myRoleRef.current = role;
+conststream=awaitnavigator.mediaDevices.getUserMedia(MEDIA_CONSTRAINTS);
+localStreamRef.current=stream;
 
-        pc._createdAt = Date.now();
-        pc._role = role;
+stream.getVideoTracks().forEach(track=>{
+track.enabled=isVideoEnabled;
+});
+stream.getAudioTracks().forEach(track=>{
+track.enabled=isMicEnabled;
+});
 
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => {
-                console.log(`➕ Adding local track: ${track.kind} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                pc.addTrack(track, localStreamRef.current);
-            });
-        }
+setMediaError(null);
+console.log(`Usermediaobtainedsuccessfully(${isCurrentUser?'CurrentUser':'Opponent'})`);
+returntrue;
+}catch(err){
+console.error(`Failedtogetusermedia(${isCurrentUser?'CurrentUser':'Opponent'}):`,err);
+leterrorMessage='Couldnotaccesscamera/microphone';
 
-        pc.onicecandidate = (event) => {
-            if (event.candidate && opponentSocketId) {
-                console.log(`🧊 Sending ICE candidate (${role}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                socket.emit('ice-candidate', {
-                    targetSocketId: opponentSocketId,
-                    candidate: event.candidate,
-                });
-            }
-        };
+switch(err.name){
+case'NotAllowedError':
+errorMessage='Camera/microphoneaccessdenied';
+break;
+case'NotFoundError':
+errorMessage='Nocamera/microphonefound';
+break;
+case'NotReadableError':
+errorMessage='Camera/microphoneisbeingusedbyanotherapplication';
+break;
+}
 
-        pc.ontrack = (event) => {
-            console.log(`📹 Received remote track: ${event.track.kind} (${role}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            const [remoteStream] = event.streams;
-            
-            if (remoteStream && remoteStream.getTracks().length > 0) {
-                remoteStreamRef.current = remoteStream;
-                setConnectionState('connected');
-                console.log(`✅ Remote stream set with ${remoteStream.getTracks().length} tracks (${role}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            }
-        };
+setMediaError(errorMessage);
+toast.error(errorMessage);
+returnfalse;
+}
+},[isVideoEnabled,isMicEnabled,isCurrentUser]);
 
-        pc.onconnectionstatechange = () => {
-            const state = pc.connectionState;
-            console.log(`🔄 Connection state changed: ${state} (${role}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            setConnectionState(state);
+//Createpeerconnectionwithsafeguards
+constcreatePeerConnection=useCallback((role)=>{
+if(peerConnectionRef.current&&peerConnectionRef.current.signalingState!=='closed'){
+console.log(`Peerconnectionalreadyexistsandnotclosed,reusingexistingone(${isCurrentUser?'CurrentUser':'Opponent'})`);
+returnpeerConnectionRef.current;
+}
 
-            switch (state) {
-                case 'connected':
-                    toast.success('Video call connected!');
-                    callStateRef.current = 'connected';
-                    break;
-                case 'disconnected':
-                    toast.warn('Connection lost');
-                    break;
-                case 'failed':
-                    toast.error('Connection failed');
-                    callStateRef.current = 'failed';
-                    break;
-            }
-        };
+console.log(`Creatingnewpeerconnectionas${role}...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+constpc=newRTCPeerConnection(ICE_SERVERS);
+peerConnectionRef.current=pc;
+myRoleRef.current=role;
 
-        pc.onsignalingstatechange = () => {
-            console.log(`🔄 Signaling state changed: ${pc.signalingState} (${role}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-        };
+pc._createdAt=Date.now();
+pc._role=role;
 
-        return pc;
-    }, [socket, opponentSocketId, isCurrentUser]);
+if(localStreamRef.current){
+localStreamRef.current.getTracks().forEach(track=>{
+console.log(`Addinglocaltrack:${track.kind}(${isCurrentUser?'CurrentUser':'Opponent'})`);
+pc.addTrack(track,localStreamRef.current);
+});
+}
 
-    // Initiate call as the caller
-    const initiateCall = useCallback(async () => {
-        if (!shouldInitiateCall || callStateRef.current !== 'ready') {
-            console.log(`❌ Not supposed to initiate call or not ready. State: ${callStateRef.current} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            return;
-        }
+pc.onicecandidate=(event)=>{
+if(event.candidate&&opponentSocketId){
+console.log(`SendingICEcandidate(${role})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+socket.emit('ice-candidate',{
+targetSocketId:opponentSocketId,
+candidate:event.candidate,
+});
+}
+};
 
-        if (isProcessingOfferRef.current) {
-            console.log(`⚠️ Already processing offer, skipping... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            return;
-        }
+pc.ontrack=(event)=>{
+console.log(`Receivedremotetrack:${event.track.kind}(${role})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+const[remoteStream]=event.streams;
 
-        isProcessingOfferRef.current = true;
+if(remoteStream&&remoteStream.getTracks().length>0){
+remoteStreamRef.current=remoteStream;
+setConnectionState('connected');
+console.log(`Remotestreamsetwith${remoteStream.getTracks().length}tracks(${role})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}
+};
 
-        const pc = createPeerConnection('caller');
-        if (!pc || !opponentSocketId) {
-            console.log(`❌ Missing requirements for call initiation (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            isProcessingOfferRef.current = false;
-            return;
-        }
+pc.onconnectionstatechange=()=>{
+conststate=pc.connectionState;
+console.log(`Connectionstatechanged:${state}(${role})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+setConnectionState(state);
 
-        try {
-            console.log(`🤝 Creating offer... (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            setConnectionState('connecting');
-            callStateRef.current = 'calling';
-            
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            
-            console.log(`📤 Sending offer. Signaling state: ${pc.signalingState} (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            
-            socket.emit('call-user', {
-                targetSocketId: opponentSocketId,
-                offer: pc.localDescription,
-            });
-            
-            console.log(`📤 Offer sent (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-        } catch (error) {
-            console.error(`❌ Failed to create offer (caller) (${isCurrentUser ? 'Current User' : 'Opponent'}):`, error);
-            toast.error('Failed to initiate call');
-            callStateRef.current = 'failed';
-        } finally {
-            isProcessingOfferRef.current = false;
-        }
-    }, [socket, opponentSocketId, shouldInitiateCall, isCurrentUser, createPeerConnection]);
+switch(state){
+case'connected':
+toast.success('Videocallconnected!');
+callStateRef.current='connected';
+break;
+case'disconnected':
+toast.warn('Connectionlost');
+break;
+case'failed':
+toast.error('Connectionfailed');
+callStateRef.current='failed';
+break;
+}
+};
 
-    // Listen for opponentJoined event
-    useEffect(() => {
-        const handleOpponentJoined = (data) => {
-            console.log(`👥 Opponent joined event received (${isCurrentUser ? 'Current User' : 'Opponent'}):`, data);
-            
-            if (isCurrentUser) {
-                setShouldInitiateCall(data.shouldInitiateCall || false);
-            }
-        };
+pc.onsignalingstatechange=()=>{
+console.log(`Signalingstatechanged:${pc.signalingState}(${role})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+};
 
-        socket.on('opponentJoined', handleOpponentJoined);
-        
-        return () => {
-            socket.off('opponentJoined', handleOpponentJoined);
-        };
-    }, [socket, isCurrentUser]);
+returnpc;
+},[socket,opponentSocketId,isCurrentUser]);
 
-    // Initialize WebRTC when opponent is available
-    useEffect(() => {
-        if (!opponentSocketId || hasInitializedRef.current || isInitializingRef.current) return;
+//Initiatecallasthecaller
+constinitiateCall=useCallback(async()=>{
+if(!shouldInitiateCall||callStateRef.current!=='ready'){
+console.log(`Notsupposedtoinitiatecallornotready.State:${callStateRef.current}(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
 
-        const initializeConnection = async () => {
-            console.log(`🚀 Initializing WebRTC connection... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            isInitializingRef.current = true;
-            hasInitializedRef.current = true;
+if(isProcessingOfferRef.current){
+console.log(`Alreadyprocessingoffer,skipping...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
 
-            const mediaSuccess = await initializeMedia();
-            if (!mediaSuccess) {
-                isInitializingRef.current = false;
-                return;
-            }
+isProcessingOfferRef.current=true;
 
-            callStateRef.current = 'ready';
-            setConnectionState('ready');
+constpc=createPeerConnection('caller');
+if(!pc||!opponentSocketId){
+console.log(`Missingrequirementsforcallinitiation(${isCurrentUser?'CurrentUser':'Opponent'})`);
+isProcessingOfferRef.current=false;
+return;
+}
 
-            if (shouldInitiateCall && isCurrentUser) {
-                myRoleRef.current = 'caller';
-                console.log(`📞 Will initiate call in 2 seconds as caller... (Current User)`);
-                setTimeout(() => {
-                    initiateCall();
-                    isInitializingRef.current = false;
-                }, 2000);
-            } else {
-                console.log(`👂 Waiting for incoming call... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                callStateRef.current = 'waiting';
-                isInitializingRef.current = false;
-            }
-        };
+try{
+console.log(`Creatingoffer...(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+setConnectionState('connecting');
+callStateRef.current='calling';
 
-        initializeConnection();
-    }, [opponentSocketId, shouldInitiateCall, initializeMedia, initiateCall, isCurrentUser]);
+constoffer=awaitpc.createOffer();
+awaitpc.setLocalDescription(offer);
 
-    // Handle opponent disconnection
-    useEffect(() => {
-        if (!opponentSocketId && hasInitializedRef.current) {
-            console.log(`👋 Opponent disconnected, cleaning up... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            cleanup();
-        }
-    }, [opponentSocketId, cleanup, isCurrentUser]);
+console.log(`Sendingoffer.Signalingstate:${pc.signalingState}(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
 
-    // Socket event handlers
-    useEffect(() => {
-        const handleIncomingCall = async ({ from, offer }) => {
-            if (from !== opponentSocketId) return;
-            
-            console.log(`📞 INCOMING CALL from: ${from}. My role: ${myRoleRef.current}. Call state: ${callStateRef.current} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            
-            if (callStateRef.current !== 'waiting' && callStateRef.current !== 'ready') {
-                console.log(`⚠️ Not in correct state to receive call: ${callStateRef.current} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                return;
-            }
+socket.emit('call-user',{
+targetSocketId:opponentSocketId,
+offer:pc.localDescription,
+});
 
-            if (peerConnectionRef.current) {
-                console.log(`⚠️ Already have peer connection, ignoring incoming call (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                return;
-            }
-            
-            try {
-                const pc = createPeerConnection('receiver');
-                if (!pc) {
-                    console.error(`❌ Failed to create peer connection for incoming call (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                    return;
-                }
-                
-                console.log(`🔗 Created peer connection for incoming call. Signaling state: ${pc.signalingState} (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                
-                callStateRef.current = 'answering';
-                
-                await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                console.log(`✅ Remote description set. New signaling state: ${pc.signalingState} (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                
-                while (pendingCandidatesRef.current.length > 0) {
-                    const candidate = pendingCandidatesRef.current.shift();
-                    try {
-                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                        console.log(`🧊 Added queued ICE candidate (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                    } catch (err) {
-                        console.warn(`⚠️ Failed to add queued ICE candidate (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'}):`, err);
-                    }
-                }
-                
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                
-                console.log(`📤 Sending answer. Signaling state: ${pc.signalingState} (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                
-                socket.emit('answer-call', {
-                    targetSocketId: from,
-                    answer: pc.localDescription,
-                });
-                
-                console.log(`✅ Answer sent (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                setConnectionState('connecting');
-            } catch (err) {
-                console.error(`❌ Failed to handle incoming call (receiver) (${isCurrentUser ? 'Current User' : 'Opponent'}):`, err);
-                toast.error('Failed to answer call');
-                callStateRef.current = 'failed';
-            }
-        };
+console.log(`Offersent(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}catch(error){
+console.error(`Failedtocreateoffer(caller)(${isCurrentUser?'CurrentUser':'Opponent'}):`,error);
+toast.error('Failedtoinitiatecall');
+callStateRef.current='failed';
+}finally{
+isProcessingOfferRef.current=false;
+}
+},[socket,opponentSocketId,shouldInitiateCall,isCurrentUser,createPeerConnection]);
 
-        const handleCallAnswered = async ({ from, answer }) => {
-            if (from !== opponentSocketId) return;
+//ListenforopponentJoinedevent
+useEffect(()=>{
+consthandleOpponentJoined=(data)=>{
+console.log(`Opponentjoinedeventreceived(${isCurrentUser?'CurrentUser':'Opponent'}):`,data);
 
-            console.log(`✅ CALL ANSWERED by: ${from}. My role: ${myRoleRef.current}. Call state: ${callStateRef.current} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            
-            debugPeerConnection();
+if(isCurrentUser){
+setShouldInitiateCall(data.shouldInitiateCall||false);
+}
+};
 
-            if (myRoleRef.current !== 'caller') {
-                console.log(`⚠️ Received answer but I'm not the caller (I'm ${myRoleRef.current}). Ignoring. (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                return;
-            }
+socket.on('opponentJoined',handleOpponentJoined);
 
-            if (isProcessingAnswerRef.current) {
-                console.log(`⚠️ Already processing answer, ignoring... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                return;
-            }
+return()=>{
+socket.off('opponentJoined',handleOpponentJoined);
+};
+},[socket,isCurrentUser]);
 
-            isProcessingAnswerRef.current = true;
+//InitializeWebRTCwhenopponentisavailable
+useEffect(()=>{
+if(!opponentSocketId||hasInitializedRef.current||isInitializingRef.current)return;
 
-            const pc = peerConnectionRef.current;
-            if (!pc) {
-                console.log(`⚠️ No peer connection for answer (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                isProcessingAnswerRef.current = false;
-                return;
-            }
+constinitializeConnection=async()=>{
+console.log(`InitializingWebRTCconnection...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+isInitializingRef.current=true;
+hasInitializedRef.current=true;
 
-            const signalingState = pc.signalingState;
-            console.log(`🔍 DETAILED STATE CHECK:`, {
-                signalingState,
-                callState: callStateRef.current,
-                pcCreatedAt: pc._createdAt,
-                pcRole: pc._role,
-                currentTime: Date.now(),
-                isCurrentUser
-            });
+constmediaSuccess=awaitinitializeMedia();
+if(!mediaSuccess){
+isInitializingRef.current=false;
+return;
+}
 
-            if (signalingState !== 'have-local-offer') {
-                console.warn(`⚠️ Signaling state is '${signalingState}' - expected 'have-local-offer'. Queuing answer... (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                pendingAnswersRef.current.push(answer);
-                isProcessingAnswerRef.current = false;
-                return;
-            }
+callStateRef.current='ready';
+setConnectionState('ready');
 
-            try {
-                await pc.setRemoteDescription(new RTCSessionDescription(answer));
-                console.log(`✅ Remote description set from answer. New signaling state: ${pc.signalingState} (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
+if(shouldInitiateCall&&isCurrentUser){
+myRoleRef.current='caller';
+console.log(`Willinitiatecallin2secondsascaller...(CurrentUser)`);
+setTimeout(()=>{
+initiateCall();
+isInitializingRef.current=false;
+},2000);
+}else{
+console.log(`Waitingforincomingcall...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+callStateRef.current='waiting';
+isInitializingRef.current=false;
+}
+};
 
-                callStateRef.current = 'connected';
+initializeConnection();
+},[opponentSocketId,shouldInitiateCall,initializeMedia,initiateCall,isCurrentUser]);
 
-                while (pendingCandidatesRef.current.length > 0) {
-                    const candidate = pendingCandidatesRef.current.shift();
-                    try {
-                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                        console.log(`🧊 Added queued ICE candidate (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                    } catch (err) {
-                        console.warn(`⚠️ Failed to add queued ICE candidate (caller) (${isCurrentUser ? 'Current User' : 'Opponent'}):`, err);
-                    }
-                }
+//Handleopponentdisconnection
+useEffect(()=>{
+if(!opponentSocketId&&hasInitializedRef.current){
+console.log(`Opponentdisconnected,cleaningup...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+cleanup();
+}
+},[opponentSocketId,cleanup,isCurrentUser]);
 
-                if (pendingAnswersRef.current.length > 0) {
-                    const queuedAnswer = pendingAnswersRef.current.shift();
-                    await pc.setRemoteDescription(new RTCSessionDescription(queuedAnswer));
-                    console.log(`✅ Processed queued answer. New signaling state: ${pc.signalingState} (caller) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                }
-            } catch (err) {
-                console.error(`❌ Failed to handle call answer (caller) (${isCurrentUser ? 'Current User' : 'Opponent'}):`, err);
-                callStateRef.current = 'failed';
-            } finally {
-                isProcessingAnswerRef.current = false;
-            }
-        };
+//Socketeventhandlers
+useEffect(()=>{
+consthandleIncomingCall=async({from,offer})=>{
+if(from!==opponentSocketId)return;
 
-        const handleIceCandidate = async ({ from, candidate }) => {
-            if (from !== opponentSocketId) return;
-            
-            try {
-                const pc = peerConnectionRef.current;
-                if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                    console.log(`🧊 ICE candidate added (${myRoleRef.current}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                } else {
-                    console.log(`🧊 Queuing ICE candidate (no remote description yet) (${myRoleRef.current}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-                    pendingCandidatesRef.current.push(candidate);
-                }
-            } catch (err) {
-                console.error(`❌ Failed to add ICE candidate (${myRoleRef.current}) (${isCurrentUser ? 'Current User' : 'Opponent'}):`, err);
-            }
-        };
+console.log(`INCOMINGCALLfrom:${from}.Myrole:${myRoleRef.current}.Callstate:${callStateRef.current}(${isCurrentUser?'CurrentUser':'Opponent'})`);
 
-        const handleCallEnded = ({ from }) => {
-            if (from !== opponentSocketId) return;
-            console.log(`📞 Call ended by: ${from} (${myRoleRef.current}) (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-            cleanup();
-            toast.info('Call ended by opponent');
-        };
+if(callStateRef.current!=='waiting'&&callStateRef.current!=='ready'){
+console.log(`Notincorrectstatetoreceivecall:${callStateRef.current}(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
 
-        socket.on('incoming-call', handleIncomingCall);
-        socket.on('call-answered', handleCallAnswered);
-        socket.on('ice-candidate', handleIceCandidate);
-        socket.on('call-ended', handleCallEnded);
+if(peerConnectionRef.current){
+console.log(`Alreadyhavepeerconnection,ignoringincomingcall(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
 
-        return () => {
-            socket.off('incoming-call', handleIncomingCall);
-            socket.off('call-answered', handleCallAnswered);
-            socket.off('ice-candidate', handleIceCandidate);
-            socket.off('call-ended', handleCallEnded);
-        };
-    }, [socket, opponentSocketId, createPeerConnection, cleanup, isCurrentUser, debugPeerConnection]);
+try{
+constpc=createPeerConnection('receiver');
+if(!pc){
+console.error(`Failedtocreatepeerconnectionforincomingcall(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
 
-    // Media control functions
-    const toggleMic = useCallback(() => {
-        if (!localStreamRef.current) return;
-        
-        const audioTracks = localStreamRef.current.getAudioTracks();
-        const newState = !isMicEnabled;
-        
-        audioTracks.forEach(track => {
-            track.enabled = newState;
-        });
-        
-        setMicEnabled(newState);
-        console.log(`🎤 Microphone ${newState ? 'enabled' : 'disabled'} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-    }, [isMicEnabled, isCurrentUser]);
+console.log(`Createdpeerconnectionforincomingcall.Signalingstate:${pc.signalingState}(receiver)(${isCurrentUser?'CurrentUser':'Opponent'})`);
 
-    const toggleVideo = useCallback(() => {
-        if (!localStreamRef.current) return;
-        
-        const videoTracks = localStreamRef.current.getVideoTracks();
-        const newState = !isVideoEnabled;
-        
-        videoTracks.forEach(track => {
-            track.enabled = newState;
-        });
-        
-        setVideoEnabled(newState);
-        console.log(`📹 Video ${newState ? 'enabled' : 'disabled'} (${isCurrentUser ? 'Current User' : 'Opponent'})`);
-    }, [isVideoEnabled, isCurrentUser]);
+callStateRef.current='answering';
 
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            cleanup();
-        };
-    }, [cleanup]);
+awaitpc.setRemoteDescription(newRTCSessionDescription(offer));
+console.log(`Remotedescriptionset.Newsignalingstate:${pc.signalingState}(receiver)(${isCurrentUser?'CurrentUser':'Opponent'})`);
 
-    return {
-        localStream: localStreamRef.current,
-        remoteStream: remoteStreamRef.current,
-        connectionState,
-        mediaError,
-        isMicEnabled,
-        isVideoEnabled,
-        toggleMic,
-        toggleVideo,
-        shouldInitiateCall,
-    };
+while(pendingCandidatesRef.current.length>0){
+constcandidate=pendingCandidatesRef.current.shift();
+try{
+awaitpc.addIceCandidate(newRTCIceCandidate(candidate));
+console.log(`AddedqueuedICEcandidate(receiver)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}catch(err){
+console.warn(`FailedtoaddqueuedICEcandidate(receiver)(${isCurrentUser?'CurrentUser':'Opponent'}):`,err);
+}
+}
+
+constanswer=awaitpc.createAnswer();
+awaitpc.setLocalDescription(answer);
+
+console.log(`Sendinganswer.Signalingstate:${pc.signalingState}(receiver)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+
+socket.emit('answer-call',{
+targetSocketId:from,
+answer:pc.localDescription,
+});
+
+console.log(`Answersent(receiver)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+setConnectionState('connecting');
+}catch(err){
+console.error(`Failedtohandleincomingcall(receiver)(${isCurrentUser?'CurrentUser':'Opponent'}):`,err);
+toast.error('Failedtoanswercall');
+callStateRef.current='failed';
+}
+};
+
+consthandleCallAnswered=async({from,answer})=>{
+if(from!==opponentSocketId)return;
+
+console.log(`CALLANSWEREDby:${from}.Myrole:${myRoleRef.current}.Callstate:${callStateRef.current}(${isCurrentUser?'CurrentUser':'Opponent'})`);
+
+debugPeerConnection();
+
+if(myRoleRef.current!=='caller'){
+console.log(`ReceivedanswerbutI'mnotthecaller(I'm${myRoleRef.current}).Ignoring.(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
+
+if(isProcessingAnswerRef.current){
+console.log(`Alreadyprocessinganswer,ignoring...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+return;
+}
+
+isProcessingAnswerRef.current=true;
+
+constpc=peerConnectionRef.current;
+if(!pc){
+console.log(`Nopeerconnectionforanswer(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+isProcessingAnswerRef.current=false;
+return;
+}
+
+constsignalingState=pc.signalingState;
+console.log(`DETAILEDSTATECHECK:`,{
+signalingState,
+callState:callStateRef.current,
+pcCreatedAt:pc._createdAt,
+pcRole:pc._role,
+currentTime:Date.now(),
+isCurrentUser
+});
+
+if(signalingState!=='have-local-offer'){
+console.warn(`Signalingstateis'${signalingState}'-expected'have-local-offer'.Queuinganswer...(${isCurrentUser?'CurrentUser':'Opponent'})`);
+pendingAnswersRef.current.push(answer);
+isProcessingAnswerRef.current=false;
+return;
+}
+
+try{
+awaitpc.setRemoteDescription(newRTCSessionDescription(answer));
+console.log(`Remotedescriptionsetfromanswer.Newsignalingstate:${pc.signalingState}(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+
+callStateRef.current='connected';
+
+while(pendingCandidatesRef.current.length>0){
+constcandidate=pendingCandidatesRef.current.shift();
+try{
+awaitpc.addIceCandidate(newRTCIceCandidate(candidate));
+console.log(`AddedqueuedICEcandidate(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}catch(err){
+console.warn(`FailedtoaddqueuedICEcandidate(caller)(${isCurrentUser?'CurrentUser':'Opponent'}):`,err);
+}
+}
+
+if(pendingAnswersRef.current.length>0){
+constqueuedAnswer=pendingAnswersRef.current.shift();
+awaitpc.setRemoteDescription(newRTCSessionDescription(queuedAnswer));
+console.log(`Processedqueuedanswer.Newsignalingstate:${pc.signalingState}(caller)(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}
+}catch(err){
+console.error(`Failedtohandlecallanswer(caller)(${isCurrentUser?'CurrentUser':'Opponent'}):`,err);
+callStateRef.current='failed';
+}finally{
+isProcessingAnswerRef.current=false;
+}
+};
+
+consthandleIceCandidate=async({from,candidate})=>{
+if(from!==opponentSocketId)return;
+
+try{
+constpc=peerConnectionRef.current;
+if(pc&&pc.remoteDescription&&pc.remoteDescription.type){
+awaitpc.addIceCandidate(newRTCIceCandidate(candidate));
+console.log(`ICEcandidateadded(${myRoleRef.current})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+}else{
+console.log(`QueuingICEcandidate(noremotedescriptionyet)(${myRoleRef.current})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+pendingCandidatesRef.current.push(candidate);
+}
+}catch(err){
+console.error(`FailedtoaddICEcandidate(${myRoleRef.current})(${isCurrentUser?'CurrentUser':'Opponent'}):`,err);
+}
+};
+
+consthandleCallEnded=({from})=>{
+if(from!==opponentSocketId)return;
+console.log(`Callendedby:${from}(${myRoleRef.current})(${isCurrentUser?'CurrentUser':'Opponent'})`);
+cleanup();
+toast.info('Callendedbyopponent');
+};
+
+socket.on('incoming-call',handleIncomingCall);
+socket.on('call-answered',handleCallAnswered);
+socket.on('ice-candidate',handleIceCandidate);
+socket.on('call-ended',handleCallEnded);
+
+return()=>{
+socket.off('incoming-call',handleIncomingCall);
+socket.off('call-answered',handleCallAnswered);
+socket.off('ice-candidate',handleIceCandidate);
+socket.off('call-ended',handleCallEnded);
+};
+},[socket,opponentSocketId,createPeerConnection,cleanup,isCurrentUser,debugPeerConnection]);
+
+//Mediacontrolfunctions
+consttoggleMic=useCallback(()=>{
+if(!localStreamRef.current)return;
+
+constaudioTracks=localStreamRef.current.getAudioTracks();
+constnewState=!isMicEnabled;
+
+audioTracks.forEach(track=>{
+track.enabled=newState;
+});
+
+setMicEnabled(newState);
+console.log(`Microphone${newState?'enabled':'disabled'}(${isCurrentUser?'CurrentUser':'Opponent'})`);
+},[isMicEnabled,isCurrentUser]);
+
+consttoggleVideo=useCallback(()=>{
+if(!localStreamRef.current)return;
+
+constvideoTracks=localStreamRef.current.getVideoTracks();
+constnewState=!isVideoEnabled;
+
+videoTracks.forEach(track=>{
+track.enabled=newState;
+});
+
+setVideoEnabled(newState);
+console.log(`Video${newState?'enabled':'disabled'}(${isCurrentUser?'CurrentUser':'Opponent'})`);
+},[isVideoEnabled,isCurrentUser]);
+
+//Cleanuponunmount
+useEffect(()=>{
+return()=>{
+cleanup();
+};
+},[cleanup]);
+
+return{
+localStream:localStreamRef.current,
+remoteStream:remoteStreamRef.current,
+connectionState,
+mediaError,
+isMicEnabled,
+isVideoEnabled,
+toggleMic,
+toggleVideo,
+shouldInitiateCall,
+};
 };

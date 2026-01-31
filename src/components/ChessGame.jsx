@@ -70,7 +70,7 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
 
   useEffect(() => {
     const handleGameOver = (data) => {
-      console.log("Game over event received:", data);
+
       setGameOverData(data);
       setStatus(data.status);
     };
@@ -106,11 +106,11 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
 
   useEffect(() => {
     if (effectiveUserId && effectiveRoomId) {
-      console.log("Joining the room!");
+
       socket.emit("joinRoom", { userId: effectiveUserId, roomId: effectiveRoomId, color: effectiveColor });
 
       const handleColorAssignment = (assignedColor) => {
-        console.log(`Server assigned color: ${assignedColor}`);
+
         setPlayerColor(assignedColor);
       };
 
@@ -138,7 +138,7 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
 
   useEffect(() => {
     const handleBothPlayersJoined = async ({ gameId, fen, moves, opponentSocketId, whiteTimeLeft, blackTimeLeft }) => {
-      console.log("Both players joined");
+
       setWhiteTimeLeft(whiteTimeLeft);
       setBlackTimeLeft(blackTimeLeft);
       if (playerColor === 'white') {
@@ -172,7 +172,7 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
     const handleOpponentDraw = () => setDrawOfferVisible(true);
     const handleOpponentResign = () => setStatus("win");
     const handleDrawAccepted = () => setStatus("draw");
-    const handleDrawDeclined = () => toast.info("Opponent rejected your draw offer ❌");
+    const handleDrawDeclined = () => toast.info("Opponent rejected your draw offer");
 
     socket.on("bothPlayersJoined", handleBothPlayersJoined);
     socket.on("Opponent Draw", handleOpponentDraw);
@@ -191,7 +191,7 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
 
   useEffect(() => {
     const handleReceiveMessage = (serverMessage) => {
-      console.log("got the message");
+
       const incomingMsg = {
         id: Date.now(),
         message: serverMessage.message,
@@ -326,8 +326,7 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   };
 
   const handleDraw = () => {
-    console.log("🤝 handleDraw Triggered");
-    console.log("Value check:", { effectiveRoomId });
+
     if (!effectiveRoomId) {
       toast.error("Error: Room ID invalid. Cannot offer draw.");
       return;
@@ -337,9 +336,7 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
   };
 
   const handleResign = () => {
-    console.log("🏳️ handleResign Triggered");
     const currentGameId = getSession("gameId") || gameId;
-    console.log("Value check:", { effectiveRoomId, currentGameId, effectiveUserId });
 
     if (!effectiveRoomId || !currentGameId || !effectiveUserId) {
       console.error("Missing critical data for resign:", { effectiveRoomId, currentGameId, effectiveUserId });
@@ -473,11 +470,11 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
       {drawOfferVisible && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-sm w-full">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">🤝 Opponent offered a draw</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Opponent offered a draw</h2>
             <p className="mb-6 text-gray-600">Do you want to accept it?</p>
             <div className="flex justify-center gap-4">
-              <button onClick={acceptDraw} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">✅ Accept</button>
-              <button onClick={declineDraw} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">❌ Decline</button>
+              <button onClick={acceptDraw} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">Accept</button>
+              <button onClick={declineDraw} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Decline</button>
             </div>
           </div>
         </div>
@@ -486,16 +483,16 @@ const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
       {showBackWarning && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-sm w-full">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">⚠️ Are you sure you want to leave?</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Are you sure you want to leave?</h2>
             <p className="mb-6 text-gray-600">Please finish the game before going to dashboard.</p>
             <div className="flex justify-center gap-4">
-              <button onClick={() => setShowBackWarning(false)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">🚀 Continue Game</button>
+              <button onClick={() => setShowBackWarning(false)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">Continue Game</button>
               <button onClick={() => {
                 setStatus("lose");
                 const currentGameId = getSession("gameId") || gameId;
                 socket.emit("Resign", { roomId: effectiveRoomId, gameId: currentGameId, userId: effectiveUserId });
                 setShowBackWarning(false);
-              }} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">🔚 Finish Game</button>
+              }} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Finish Game</button>
             </div>
           </div>
         </div>

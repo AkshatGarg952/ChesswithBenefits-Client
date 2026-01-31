@@ -1,6 +1,6 @@
 import { Video, Crown, Clock, Mic, MicOff, VideoOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import socket from "../socket/SocketConnection.js";
+import { socket } from "../socket/SocketConnection.js";
 
 const PlayerCard = ({
     playerName,

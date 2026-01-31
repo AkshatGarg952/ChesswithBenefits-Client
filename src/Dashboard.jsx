@@ -3,7 +3,7 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 import { Users, Plus, LogOut, Home, BarChart3, Circle, TrendingUp, Target, Trophy, Zap } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from "react-router-dom";
-import socket from "./socket/SocketConnection.js";
+import { socket } from "./socket/SocketConnection.js";
 import { getSession, setSession, clearGameSession } from './utils/session.js';
 const ChessDashboard = () => {
   clearGameSession()

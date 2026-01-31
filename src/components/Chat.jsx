@@ -1,6 +1,6 @@
 import { MessageCircle, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import socket from "../socket/SocketConnection.js";
+import { socket } from "../socket/SocketConnection.js";
 
 const Chat = ({ className = "", messages, onSendMessage, roomId }) => {
   console.log(roomId);
@@ -55,8 +55,8 @@ const Chat = ({ className = "", messages, onSendMessage, roomId }) => {
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.isSent ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-xs px-4 py-2 rounded-2xl ${message.isSent
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-100 text-gray-800'
+              ? 'bg-orange-500 text-white'
+              : 'bg-gray-100 text-gray-800'
               }`}>
               <p className="text-sm">{message.message}</p>
               <p className={`text-xs mt-1 ${message.isSent ? 'text-orange-100' : 'text-gray-500'

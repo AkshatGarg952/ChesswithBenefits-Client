@@ -1,40 +1,40 @@
 import { MessageCircle, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import socket from "../socket/SocketConnection.jsx";
+import socket from "../socket/SocketConnection.js";
 
 const Chat = ({ className = "", messages, onSendMessage, roomId }) => {
   console.log(roomId);
   const [newMessage, setNewMessage] = useState('');
-  
- 
-  
-
-function formatTime12Hour(isoTime) {
-  return new Date(isoTime).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
 
 
 
-  const handleSendMessage = (e) => {  
+
+  function formatTime12Hour(isoTime) {
+    return new Date(isoTime).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
+
+
+
+  const handleSendMessage = (e) => {
     e.preventDefault();
-  console.log("Sending message with roomId:", roomId);
+    console.log("Sending message with roomId:", roomId);
     if (newMessage.trim()) {
       socket.emit("SendMessage", {
-  message: newMessage,
-  roomId: roomId,
-});
-      
+        message: newMessage,
+        roomId: roomId,
+      });
+
       const localMsg = {
-        id:Date.now(),
-        message:newMessage,
+        id: Date.now(),
+        message: newMessage,
         isSent: true,
         time: new Date().toISOString()
       };
-      
+
 
       onSendMessage(localMsg);
       // console.log(messages);
@@ -54,19 +54,17 @@ function formatTime12Hour(isoTime) {
       <div className="flex-1 p-4 space-y-3 overflow-y-auto max-h-64">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.isSent ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs px-4 py-2 rounded-2xl ${
-              message.isSent 
-                ? 'bg-orange-500 text-white' 
+            <div className={`max-w-xs px-4 py-2 rounded-2xl ${message.isSent
+                ? 'bg-orange-500 text-white'
                 : 'bg-gray-100 text-gray-800'
-            }`}>
-              <p className="text-sm">{message.message}</p>
-              <p className={`text-xs mt-1 ${
-                message.isSent ? 'text-orange-100' : 'text-gray-500'
               }`}>
-                {message.isSent? (
+              <p className="text-sm">{message.message}</p>
+              <p className={`text-xs mt-1 ${message.isSent ? 'text-orange-100' : 'text-gray-500'
+                }`}>
+                {message.isSent ? (
                   <span>{formatTime12Hour(message.time)}</span>
                 ) : (<span>{message.time}</span>)}
-                
+
               </p>
             </div>
           </div>

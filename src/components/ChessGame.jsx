@@ -5,7 +5,7 @@ import MoveHistory from './MoveHistory';
 import Chat from './Chat';
 import ChessBoard from './ChessBoard';
 import MobilePanel from './MobilePanel';
-import socket from "../socket/SocketConnection.jsx";
+import socket from "../socket/SocketConnection.js";
 import chatStorage from "../storage/ChatStorage.js";
 import { Chess } from "chess.js";
 import { toast } from 'react-toastify';

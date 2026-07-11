@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RotateCcw, MessageCircle } from 'lucide-react';
+import { RotateCcw, MessageCircle, X, Crown } from 'lucide-react';
 import PlayerCard from './PlayerCard';
 import MoveHistory from './MoveHistory';
 import Chat from './Chat';
@@ -12,490 +12,324 @@ import { toast } from 'react-toastify';
 import { getSession, setSession, clearGameSession } from '../utils/session.js';
 
 const useWindowSize = () => {
-  const [width, setWidth] = useState(window.innerWidth);
+  const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const h = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
   }, []);
-  return width;
+  return size;
 };
 
 const ChessGame = ({ color, roomId, userId, commentary, mode }) => {
-  const screenWidth = useWindowSize();
-  const isMobile = screenWidth <= 690;
+  const { width: screenWidth, height: screenHeight } = useWindowSize();
+  const isMobile = screenWidth < 640;
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;
+  const isLandscape = screenWidth > screenHeight;
 
-  // --- PERSISTENCE FIX START ---
-  // If props are missing (e.g., after reload), try to get them from session
-  const effectiveUserId = userId || getSession("userId");
-  const effectiveRoomId = roomId || getSession("roomId");
-  const effectiveColor = color || getSession("color");
+  const effectiveUserId    = userId    || getSession("userId");
+  const effectiveRoomId    = roomId    || getSession("roomId");
+  const effectiveColor     = color     || getSession("color");
   const effectiveCommentary = commentary || getSession("commentary");
-  const effectiveMode = mode || getSession("mode");
+  const effectiveMode      = mode      || getSession("mode");
 
   useEffect(() => {
-    if (userId) setSession("userId", userId);
-    if (roomId) setSession("roomId", roomId);
-    if (color) setSession("color", color);
+    if (userId)     setSession("userId", userId);
+    if (roomId)     setSession("roomId", roomId);
+    if (color)      setSession("color", color);
     if (commentary) setSession("commentary", commentary);
-    if (mode) setSession("mode", mode);
+    if (mode)       setSession("mode", mode);
   }, [userId, roomId, color, commentary, mode]);
-  // --- PERSISTENCE FIX END ---
 
-  const [playerColor, setPlayerColor] = useState(effectiveColor);
+  const [playerColor, setPlayerColor]   = useState(effectiveColor);
   const [currentPlayer, setCurrentPlayer] = useState(getSession("currentPlayer") || 'white');
   const [showMoveHistory, setShowMoveHistory] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [moves, setMoves] = useState(getSession("moves") || []);
-  const [gameState, setGameState] = useState(() => {
+  const [showChat, setShowChat]         = useState(false);
+  const [moves, setMoves]               = useState(getSession("moves") || []);
+  const [gameState, setGameState]       = useState(() => {
     const fen = getSession("fen");
-    try {
-      return fen ? new Chess(fen) : new Chess();
-    } catch {
-      return new Chess();
-    }
+    try { return fen ? new Chess(fen) : new Chess(); } catch { return new Chess(); }
   });
-  const [gameId, setgameId] = useState(getSession("gameId") || null);
-  const [status, setStatus] = useState(null);
+  const [gameId, setgameId]             = useState(getSession("gameId") || null);
+  const [status, setStatus]             = useState(null);
   const [opponentSocketId, setOpponentSocketId] = useState(null);
   const [drawOfferVisible, setDrawOfferVisible] = useState(false);
-  const [gameStarted, setGameStarted] = useState(() => getSession("gameStarted") === "true");
+  const [gameStarted, setGameStarted]   = useState(() => getSession("gameStarted") === "true");
   const [showBackWarning, setShowBackWarning] = useState(false);
-  const [messages, setMessages] = useState(() => chatStorage.get(effectiveRoomId, effectiveUserId));
+  const [messages, setMessages]         = useState(() => chatStorage.get(effectiveRoomId, effectiveUserId));
   const [gameOverData, setGameOverData] = useState(null);
-
   const [whiteTimeLeft, setWhiteTimeLeft] = useState(600);
   const [blackTimeLeft, setBlackTimeLeft] = useState(600);
 
-
-  useEffect(() => {
-    const handleGameOver = (data) => {
-
-      setGameOverData(data);
-      setStatus(data.status);
-    };
-
-    socket.on("gameOver", handleGameOver);
-
-    return () => {
-      socket.off("gameOver", handleGameOver);
-    };
-  }, []);
-
-
   const isBlack = playerColor === 'black';
-  const [player1, setPlayer1] = useState({
-    name: "Opponent",
-    initialTime: isBlack ? blackTimeLeft : whiteTimeLeft,
-    isActive: currentPlayer !== playerColor
-  });
-
-  const [player2, setPlayer2] = useState({
-    name: "You",
-    initialTime: isBlack ? whiteTimeLeft : blackTimeLeft,
-    isActive: currentPlayer === playerColor
-  });
+  const [player1, setPlayer1] = useState({ name: "Opponent", initialTime: isBlack ? blackTimeLeft : whiteTimeLeft, isActive: currentPlayer !== playerColor });
+  const [player2, setPlayer2] = useState({ name: "You",      initialTime: isBlack ? whiteTimeLeft : blackTimeLeft, isActive: currentPlayer === playerColor });
 
   function speak(text) {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
-    u.pitch = 1.1;
-    u.rate = 1;
+    u.lang = 'en-US'; u.pitch = 1.1; u.rate = 1;
     window.speechSynthesis.speak(u);
   }
 
   useEffect(() => {
+    const h = (data) => { setGameOverData(data); setStatus(data.status); };
+    socket.on("gameOver", h);
+    return () => socket.off("gameOver", h);
+  }, []);
+
+  useEffect(() => {
     if (effectiveUserId && effectiveRoomId) {
-
       socket.emit("joinRoom", { userId: effectiveUserId, roomId: effectiveRoomId, color: effectiveColor });
-
-      const handleColorAssignment = (assignedColor) => {
-
-        setPlayerColor(assignedColor);
-      };
-
-      socket.on("assignedColor", handleColorAssignment);
-
-      return () => {
-        socket.off("assignedColor", handleColorAssignment);
-      };
+      const h = c => setPlayerColor(c);
+      socket.on("assignedColor", h);
+      return () => socket.off("assignedColor", h);
     }
   }, [effectiveUserId, effectiveRoomId, effectiveColor]);
 
   useEffect(() => {
-    const handleOpponentDisconnected = () => {
-      toast.error("Your opponent has disconnected.");
-      setOpponentSocketId(null);
-      setGameStarted(false);
-    };
-
-    socket.on("opponent-disconnected", handleOpponentDisconnected);
-
-    return () => {
-      socket.off("opponent-disconnected", handleOpponentDisconnected);
-    };
+    const h = () => { toast.error("Your opponent has disconnected."); setOpponentSocketId(null); setGameStarted(false); };
+    socket.on("opponent-disconnected", h);
+    return () => socket.off("opponent-disconnected", h);
   }, []);
 
   useEffect(() => {
-    const handleBothPlayersJoined = async ({ gameId, fen, moves, opponentSocketId, whiteTimeLeft, blackTimeLeft }) => {
-
-      setWhiteTimeLeft(whiteTimeLeft);
-      setBlackTimeLeft(blackTimeLeft);
+    const handleBoth = async ({ gameId, fen, moves, opponentSocketId, whiteTimeLeft, blackTimeLeft }) => {
+      setWhiteTimeLeft(whiteTimeLeft); setBlackTimeLeft(blackTimeLeft);
       if (playerColor === 'white') {
-        setPlayer2(prev => ({ ...prev, initialTime: whiteTimeLeft }));
-        setPlayer1(prev => ({ ...prev, initialTime: blackTimeLeft }));
+        setPlayer2(p => ({ ...p, initialTime: whiteTimeLeft }));
+        setPlayer1(p => ({ ...p, initialTime: blackTimeLeft }));
       } else {
-        setPlayer2(prev => ({ ...prev, initialTime: blackTimeLeft }));
-        setPlayer1(prev => ({ ...prev, initialTime: whiteTimeLeft }));
+        setPlayer2(p => ({ ...p, initialTime: blackTimeLeft }));
+        setPlayer1(p => ({ ...p, initialTime: whiteTimeLeft }));
       }
       setOpponentSocketId(opponentSocketId);
-
-      const { Chess } = await import("chess.js");
-      const chess = new Chess(fen);
-
-      setGameState(chess);
-      setMoves(moves || []);
-
-      const nextTurn = chess.turn() === 'w' ? 'white' : 'black';
-      setCurrentPlayer(nextTurn);
-
-      setSession("gameId", gameId);
-      setSession("fen", fen);
-      setSession("moves", moves || []);
-      setSession("currentPlayer", nextTurn);
-      setSession("gameStarted", "true");
-
-      setgameId(gameId);
-      setGameStarted(true);
+      const { Chess: C } = await import("chess.js");
+      const chess = new C(fen);
+      setGameState(chess); setMoves(moves || []);
+      const next = chess.turn() === 'w' ? 'white' : 'black';
+      setCurrentPlayer(next);
+      setSession("gameId", gameId); setSession("fen", fen); setSession("moves", moves || []);
+      setSession("currentPlayer", next); setSession("gameStarted", "true");
+      setgameId(gameId); setGameStarted(true);
     };
-
-    const handleOpponentDraw = () => setDrawOfferVisible(true);
-    const handleOpponentResign = () => setStatus("win");
-    const handleDrawAccepted = () => setStatus("draw");
-    const handleDrawDeclined = () => toast.info("Opponent rejected your draw offer");
-
-    socket.on("bothPlayersJoined", handleBothPlayersJoined);
-    socket.on("Opponent Draw", handleOpponentDraw);
-    socket.on("Opponent Resign", handleOpponentResign);
-    socket.on("DrawAccepted", handleDrawAccepted);
-    socket.on("DrawDeclined", handleDrawDeclined);
-
+    socket.on("bothPlayersJoined", handleBoth);
+    socket.on("Opponent Draw", () => setDrawOfferVisible(true));
+    socket.on("Opponent Resign", () => setStatus("win"));
+    socket.on("DrawAccepted", () => setStatus("draw"));
+    socket.on("DrawDeclined", () => toast.info("Opponent rejected your draw offer"));
     return () => {
-      socket.off("bothPlayersJoined", handleBothPlayersJoined);
-      socket.off("Opponent Draw", handleOpponentDraw);
-      socket.off("Opponent Resign", handleOpponentResign);
-      socket.off("DrawAccepted", handleDrawAccepted);
-      socket.off("DrawDeclined", handleDrawDeclined);
+      socket.off("bothPlayersJoined", handleBoth);
+      socket.off("Opponent Draw"); socket.off("Opponent Resign");
+      socket.off("DrawAccepted"); socket.off("DrawDeclined");
     };
   }, [playerColor]);
 
   useEffect(() => {
-    const handleReceiveMessage = (serverMessage) => {
-
-      const incomingMsg = {
-        id: Date.now(),
-        message: serverMessage.message,
-        isSent: false,
-        time: new Date(serverMessage.time).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-      };
-      handleSendMessage(incomingMsg);
+    const h = (sm) => {
+      const msg = { id: Date.now(), message: sm.message, isSent: false, time: new Date(sm.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      handleSendMessage(msg);
     };
-
-    socket.on("ReceiveMessage", handleReceiveMessage);
-    return () => {
-      socket.off("ReceiveMessage", handleReceiveMessage);
-    };
+    socket.on("ReceiveMessage", h);
+    return () => socket.off("ReceiveMessage", h);
   }, [effectiveRoomId, effectiveUserId]);
 
   useEffect(() => {
-    const handleReceiveMove = async ({ move, fen, gameStatus, winner, allMoves, whiteTimeLeft: sWhiteTime, blackTimeLeft: sBlackTime }) => {
-      const pkg = await import("chess.js");
-      const { Chess } = pkg;
-      const chess = new Chess(fen); // Reconstruct from FEN to be sure
-
-      setGameState(chess);
-      setSession("fen", chess.fen());
-
-      setMoves(allMoves);
-      setSession("moves", allMoves);
-
-      // --- TIME SYNC FIX ---
-      if (sWhiteTime !== undefined && sBlackTime !== undefined) {
-        setWhiteTimeLeft(sWhiteTime);
-        setBlackTimeLeft(sBlackTime);
-
-        if (playerColor === 'white') {
-          // I am White. Player 1 is Opponent (Black). Player 2 is Me (White).
-          setPlayer1(prev => ({ ...prev, initialTime: sBlackTime }));
-          setPlayer2(prev => ({ ...prev, initialTime: sWhiteTime }));
-        } else {
-          // I am Black. Player 1 is Opponent (White). Player 2 is Me (Black).
-          setPlayer1(prev => ({ ...prev, initialTime: sWhiteTime }));
-          setPlayer2(prev => ({ ...prev, initialTime: sBlackTime }));
-        }
+    const handleMove = async ({ move, fen, gameStatus, winner, allMoves, whiteTimeLeft: sw, blackTimeLeft: sb }) => {
+      const { Chess: C } = await import("chess.js");
+      const chess = new C(fen);
+      setGameState(chess); setSession("fen", chess.fen());
+      setMoves(allMoves); setSession("moves", allMoves);
+      if (sw !== undefined && sb !== undefined) {
+        setWhiteTimeLeft(sw); setBlackTimeLeft(sb);
+        if (playerColor === 'white') { setPlayer1(p => ({ ...p, initialTime: sb })); setPlayer2(p => ({ ...p, initialTime: sw })); }
+        else { setPlayer1(p => ({ ...p, initialTime: sw })); setPlayer2(p => ({ ...p, initialTime: sb })); }
       }
-
-      const nextPlayer = chess.turn() === 'w' ? 'white' : 'black';
-      setCurrentPlayer(nextPlayer);
-      setSession("currentPlayer", nextPlayer);
-
+      const next = chess.turn() === 'w' ? 'white' : 'black';
+      setCurrentPlayer(next); setSession("currentPlayer", next);
       if (gameStatus === "drawn" || gameStatus === "finished") setStatus(winner ? (winner === effectiveUserId ? "win" : "lose") : "draw");
-
       if (effectiveCommentary === "hype") {
-        const lastMoves = allMoves.map(m => m.san || m);
-        const prompt = {
-          move: move.san,
-          fen,
-          lastMoves,
-          isUserMove: false,
-          mode: effectiveCommentary
-        };
-
+        const prompt = { move: move.san, fen, lastMoves: allMoves.map(m => m.san || m), isUserMove: false, mode: effectiveCommentary };
         try {
-          const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/commentary`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt })
-          });
-          const data = await res.json();
-          if (data.commentary) speak(data.commentary);
-        } catch (err) {
-          console.error("AI commentary error:", err);
-        }
+          const r = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/commentary`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+          const d = await r.json();
+          if (d.commentary) speak(d.commentary);
+        } catch {}
       }
     };
-
-    socket.on("receiveMove", handleReceiveMove);
-
-    socket.on("moveRejected", (data) => {
-      console.error("Move rejected:", data);
-      toast.error(`Move rejected: ${data.error}. Resyncing...`);
-      // Force reload to sync state
-      window.location.reload();
-    });
-
-    return () => {
-      socket.off("receiveMove", handleReceiveMove);
-      socket.off("moveRejected");
-    };
+    socket.on("receiveMove", handleMove);
+    socket.on("moveRejected", (d) => { console.error("Move rejected:", d); toast.error(`Move rejected. Resyncing...`); window.location.reload(); });
+    return () => { socket.off("receiveMove", handleMove); socket.off("moveRejected"); };
   }, [effectiveCommentary, moves, effectiveUserId]);
 
   const handleMove = async (move, updatedGame) => {
-    const currentGameId = getSession("gameId") || gameId;
-    socket.emit("SendMove", { move, gameId: currentGameId, userId: effectiveUserId, roomId: effectiveRoomId });
+    const gId = getSession("gameId") || gameId;
+    socket.emit("SendMove", { move, gameId: gId, userId: effectiveUserId, roomId: effectiveRoomId });
     const newMoves = [...moves, move.san];
-    setSession("moves", newMoves);
-    setMoves(newMoves);
-
-    setGameState(updatedGame);
-    setSession("fen", updatedGame.fen());
-
-    const nextPlayer = updatedGame.turn() === 'w' ? 'white' : 'black';
-    setCurrentPlayer(nextPlayer);
-    setSession("currentPlayer", nextPlayer);
-
+    setSession("moves", newMoves); setMoves(newMoves);
+    setGameState(updatedGame); setSession("fen", updatedGame.fen());
+    const next = updatedGame.turn() === 'w' ? 'white' : 'black';
+    setCurrentPlayer(next); setSession("currentPlayer", next);
     if (effectiveCommentary !== "off") {
-      const prompt = {
-        move: move.san,
-        fen: updatedGame.fen(),
-        lastMoves: newMoves,
-        isUserMove: true,
-        mode: effectiveCommentary
-      };
-
+      const prompt = { move: move.san, fen: updatedGame.fen(), lastMoves: newMoves, isUserMove: true, mode: effectiveCommentary };
       try {
-        const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/commentary`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt })
-        });
-        const data = await res.json();
-        if (data.commentary) speak(data.commentary);
-      } catch (err) {
-        console.error("AI commentary error:", err);
-      }
+        const r = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/commentary`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+        const d = await r.json();
+        if (d.commentary) speak(d.commentary);
+      } catch {}
     }
   };
 
-  const handleSendMessage = (message) => {
-    chatStorage.add(effectiveRoomId, effectiveUserId, message);
-    setMessages(prevMessages => [...prevMessages, message]);
+  const handleSendMessage = (msg) => {
+    chatStorage.add(effectiveRoomId, effectiveUserId, msg);
+    setMessages(prev => [...prev, msg]);
   };
 
   const handleDraw = () => {
-
-    if (!effectiveRoomId) {
-      toast.error("Error: Room ID invalid. Cannot offer draw.");
-      return;
-    }
+    if (!effectiveRoomId) { toast.error("Error: Room ID invalid."); return; }
     socket.emit("Draw", { roomId: effectiveRoomId });
-    toast.info("Draw offer sent! Waiting for opponent...");
+    toast.info("Draw offer sent!");
   };
 
   const handleResign = () => {
-    const currentGameId = getSession("gameId") || gameId;
-
-    if (!effectiveRoomId || !currentGameId || !effectiveUserId) {
-      console.error("Missing critical data for resign:", { effectiveRoomId, currentGameId, effectiveUserId });
-      toast.error("Error: Game data missing. Cannot resign.");
-      return;
-    }
-
+    const gId = getSession("gameId") || gameId;
+    if (!effectiveRoomId || !gId || !effectiveUserId) { toast.error("Missing game data."); return; }
     setStatus("lose");
-    socket.emit("Resign", { roomId: effectiveRoomId, gameId: currentGameId, userId: effectiveUserId });
+    socket.emit("Resign", { roomId: effectiveRoomId, gameId: gId, userId: effectiveUserId });
   };
 
-  const acceptDraw = () => {
-    const currentGameId = getSession("gameId") || gameId;
-    socket.emit("DrawAccepted", { roomId: effectiveRoomId, gameId: currentGameId });
-    setDrawOfferVisible(false);
-    setStatus("draw");
-  };
+  const acceptDraw  = () => { const gId = getSession("gameId") || gameId; socket.emit("DrawAccepted", { roomId: effectiveRoomId, gameId: gId }); setDrawOfferVisible(false); setStatus("draw"); };
+  const declineDraw = () => { socket.emit("DrawDeclined", { roomId: effectiveRoomId }); setDrawOfferVisible(false); };
 
-  const declineDraw = () => {
-    socket.emit("DrawDeclined", { roomId: effectiveRoomId });
-    setDrawOfferVisible(false);
-  };
+  const ModalOverlay = ({ children }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
+      <div className="w-full max-w-sm mx-4 animate-scale-in" style={{ background: 'linear-gradient(145deg, rgba(18,15,28,0.99), rgba(12,10,20,1))', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '1.5rem', padding: '2rem', boxShadow: '0 40px 100px rgba(0,0,0,0.8)' }}>
+        {children}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-1 lg:p-4">
-      {!isMobile && (
-        <div className="grid grid-cols-4 gap-4 max-w-6xl mx-auto">
-          <div className="space-y-4">
-            <PlayerCard
-              key={'opponent-card'}
-              playerName={player1.name}
-              initialTime={player1.initialTime}
-              isActive={player1.isActive}
-              isCurrentUser={false}
-              color={playerColor === 'white' ? 'black' : 'white'}
-              opponentSocketId={opponentSocketId}
-            />
-            <MoveHistory moves={moves} className="h-80" />
+    <div className="min-h-screen" style={{ background: '#0a0a0f' }}>
+
+      {/* ── DESKTOP LAYOUT (≥1024px) ─────────────────────────────────── */}
+      {isDesktop && (
+        <div className="flex items-start gap-4 max-w-[1400px] mx-auto p-4">
+          {/* Left sidebar */}
+          <div className="flex flex-col gap-4" style={{ width: '240px', flexShrink: 0 }}>
+            <PlayerCard key="opp" playerName={player1.name} initialTime={player1.initialTime} isActive={player1.isActive} isCurrentUser={false} color={playerColor === 'white' ? 'black' : 'white'} opponentSocketId={opponentSocketId} />
+            <MoveHistory moves={moves} className="flex-1" style={{ minHeight: 0 }} />
           </div>
-          <div className="col-span-2 min-h-[500px]">
-            <ChessBoard
-              key={`chessboard-${gameId || 'nogame'}`}
-              color={playerColor}
-              onMove={handleMove}
-              gameState={gameState}
-              status={status}
-              gameStarted={gameStarted}
-              currentPlayer={currentPlayer}
-              mode={effectiveMode}
-              handleDraw={handleDraw}
-              handleResign={handleResign}
-            />
+          {/* Board — takes remaining space */}
+          <div className="flex-1 min-w-0">
+            <ChessBoard key={`board-${gameId || 'new'}`} color={playerColor} onMove={handleMove} gameState={gameState} status={status} gameStarted={gameStarted} currentPlayer={currentPlayer} mode={effectiveMode} handleDraw={handleDraw} handleResign={handleResign} />
           </div>
-          <div className="space-y-4">
-            <PlayerCard
-              key={`player2-${effectiveUserId}`}
-              playerName={player2.name}
-              initialTime={player2.initialTime}
-              isActive={player2.isActive}
-              isCurrentUser={true}
-              color={playerColor}
-              opponentSocketId={opponentSocketId}
-            />
-            <Chat
-              className="h-80"
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              roomId={effectiveRoomId}
-            />
+          {/* Right sidebar */}
+          <div className="flex flex-col gap-4" style={{ width: '240px', flexShrink: 0 }}>
+            <PlayerCard key={`me-${effectiveUserId}`} playerName={player2.name} initialTime={player2.initialTime} isActive={player2.isActive} isCurrentUser={true} color={playerColor} opponentSocketId={opponentSocketId} />
+            <Chat className="flex-1" messages={messages} onSendMessage={handleSendMessage} roomId={effectiveRoomId} />
           </div>
         </div>
       )}
 
+      {/* ── TABLET LAYOUT (640px – 1023px) ──────────────────────────── */}
+      {isTablet && (
+        <div className="flex flex-col gap-3 max-w-[900px] mx-auto p-3">
+          {/* Player cards row */}
+          <div className="grid grid-cols-2 gap-3">
+            <PlayerCard key="tab-opp" playerName={player1.name} initialTime={player1.initialTime} isActive={player1.isActive} isCurrentUser={false} color={playerColor === 'white' ? 'black' : 'white'} opponentSocketId={opponentSocketId} />
+            <PlayerCard key={`tab-me-${effectiveUserId}`} playerName={player2.name} initialTime={player2.initialTime} isActive={player2.isActive} isCurrentUser={true} color={playerColor} opponentSocketId={opponentSocketId} />
+          </div>
+          {/* Board + sidebar row */}
+          <div className="flex gap-3 items-start">
+            {/* Board — takes ~60% width */}
+            <div style={{ flex: '0 0 58%', minWidth: 0 }}>
+              <ChessBoard key={`tab-board-${gameId || 'new'}`} color={playerColor} onMove={handleMove} gameState={gameState} status={status} gameStarted={gameStarted} currentPlayer={currentPlayer} mode={effectiveMode} handleDraw={handleDraw} handleResign={handleResign} />
+            </div>
+            {/* Sidebar — move history + chat */}
+            <div className="flex flex-col gap-3" style={{ flex: '1 1 0%', minWidth: 0 }}>
+              <MoveHistory moves={moves} className="h-56" />
+              <Chat className="h-56" messages={messages} onSendMessage={handleSendMessage} roomId={effectiveRoomId} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MOBILE LAYOUT (<640px) ───────────────────────────────────── */}
       {isMobile && (
-        <div className="w-full max-w-[400px] mx-auto space-y-3 px-2">
-          <div className="grid grid-cols-2 gap-2">
-            <PlayerCard
-              key={`mobile-player1-${opponentSocketId || 'waiting'}`}
-              playerName={player1.name}
-              initialTime={player1.initialTime}
-              isActive={player1.isActive}
-              className="h-44"
-              isCurrentUser={false}
-              color={playerColor === 'white' ? 'black' : 'white'}
-              opponentSocketId={opponentSocketId}
-            />
-            <PlayerCard
-              key={`mobile-player2-${effectiveUserId}`}
-              playerName={player2.name}
-              initialTime={player2.initialTime}
-              isActive={player2.isActive}
-              color={playerColor}
-              className="h-44"
-              isCurrentUser={true}
-              opponentSocketId={opponentSocketId}
-            />
+        <div className="w-full mx-auto" style={{ paddingBottom: isLandscape ? '0.5rem' : '5rem' }}>
+          {/* Player cards - compact row */}
+          <div className="grid grid-cols-2 gap-2 px-2 pt-2 pb-1">
+            <PlayerCard key="mob-opp" playerName={player1.name} initialTime={player1.initialTime} isActive={player1.isActive} isCurrentUser={false} color={playerColor === 'white' ? 'black' : 'white'} opponentSocketId={opponentSocketId} compact />
+            <PlayerCard key={`mob-me-${effectiveUserId}`} playerName={player2.name} initialTime={player2.initialTime} isActive={player2.isActive} color={playerColor} isCurrentUser={true} opponentSocketId={opponentSocketId} compact />
           </div>
-          <div className="h-[450px] w-full">
-            <ChessBoard
-              key={`mobile-chessboard-${gameId || 'nogame'}`}
-              color={playerColor}
-              onMove={handleMove}
-              gameState={gameState}
-              status={status}
-              mode={mode}
-              handleDraw={handleDraw}
-              handleResign={handleResign}
-              gameStarted={gameStarted}
-              currentPlayer={currentPlayer}
-            />
+          {/* Chess board — fills screen width with aspect ratio padding */}
+          <div className="px-2">
+            <ChessBoard key={`mob-board-${gameId || 'new'}`} color={playerColor} onMove={handleMove} gameState={gameState} status={status} mode={effectiveMode} handleDraw={handleDraw} handleResign={handleResign} gameStarted={gameStarted} currentPlayer={currentPlayer} />
           </div>
-          <div className="fixed bottom-3 left-3 right-3 flex justify-between pointer-events-none z-10">
-            <button onClick={() => setShowMoveHistory(true)} className="w-11 h-11 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all duration-300 hover:scale-110 pointer-events-auto">
-              <RotateCcw className="w-4 h-4 mx-auto" />
-            </button>
-            <button onClick={() => setShowChat(true)} className="w-11 h-11 bg-orange-500 text-white rounded-full shadow-lg hover:bg-orange-600 transition-all duration-300 hover:scale-110 pointer-events-auto">
-              <MessageCircle className="w-4 h-4 mx-auto" />
-            </button>
+          {/* FABs — fixed, above safe area */}
+          <div className="fixed bottom-0 left-0 right-0 z-10 px-4 pb-safe"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))', background: 'linear-gradient(to top, rgba(10,10,15,0.95) 0%, transparent 100%)', pointerEvents: 'none' }}>
+            <div className="flex justify-between items-center py-2" style={{ pointerEvents: 'auto' }}>
+              <button onClick={() => setShowMoveHistory(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #c9a84c, #8b6914)', boxShadow: '0 8px 25px rgba(201,168,76,0.4)' }}>
+                <RotateCcw className="w-4 h-4 text-[#0a0a0f]" />
+                <span className="text-xs font-bold text-[#0a0a0f]">Moves</span>
+              </button>
+              <button onClick={() => setShowChat(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #c9a84c, #8b6914)', boxShadow: '0 8px 25px rgba(201,168,76,0.4)' }}>
+                <MessageCircle className="w-4 h-4 text-[#0a0a0f]" />
+                <span className="text-xs font-bold text-[#0a0a0f]">Chat</span>
+              </button>
+            </div>
           </div>
           <MobilePanel isOpen={showMoveHistory} onClose={() => setShowMoveHistory(false)} title="Move History">
-            <div className="p-4 max-h-[60vh] overflow-y-auto">
-              <MoveHistory moves={moves} />
-            </div>
+            <div className="p-4 overflow-y-auto" style={{ maxHeight: isLandscape ? '50vh' : '65vh' }}><MoveHistory moves={moves} /></div>
           </MobilePanel>
           <MobilePanel isOpen={showChat} onClose={() => setShowChat(false)} title="Chat">
-            <Chat className="h-full border-0 shadow-none rounded-none max-h-[60vh] overflow-y-auto" messages={messages} onSendMessage={handleSendMessage} roomId={effectiveRoomId} />
+            <Chat className="h-full border-0 shadow-none rounded-none overflow-y-auto" style={{ maxHeight: isLandscape ? '50vh' : '65vh' }} messages={messages} onSendMessage={handleSendMessage} roomId={effectiveRoomId} />
           </MobilePanel>
         </div>
       )}
 
+      {/* Draw offer modal */}
       {drawOfferVisible && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-sm w-full">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Opponent offered a draw</h2>
-            <p className="mb-6 text-gray-600">Do you want to accept it?</p>
-            <div className="flex justify-center gap-4">
-              <button onClick={acceptDraw} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">Accept</button>
-              <button onClick={declineDraw} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Decline</button>
+        <ModalOverlay>
+          <div className="text-center">
+            <div className="text-4xl mb-3">🤝</div>
+            <h2 className="text-xl font-bold text-white mb-1" style={{ fontFamily: 'Cinzel, serif' }}>Draw Offered</h2>
+            <p className="text-sm mb-6" style={{ color: 'rgba(220,210,185,0.55)' }}>Your opponent is offering a draw. Do you accept?</p>
+            <div className="flex gap-3">
+              <button onClick={declineDraw} className="btn-dark flex-1">Decline</button>
+              <button onClick={acceptDraw} className="btn-gold flex-1">Accept</button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
+      {/* Back warning modal */}
       {showBackWarning && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-sm w-full">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Are you sure you want to leave?</h2>
-            <p className="mb-6 text-gray-600">Please finish the game before going to dashboard.</p>
-            <div className="flex justify-center gap-4">
-              <button onClick={() => setShowBackWarning(false)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">Continue Game</button>
+        <ModalOverlay>
+          <div className="text-center">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h2 className="text-xl font-bold text-white mb-1" style={{ fontFamily: 'Cinzel, serif' }}>Leave the Game?</h2>
+            <p className="text-sm mb-6" style={{ color: 'rgba(220,210,185,0.55)' }}>Please finish the game before going to dashboard.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowBackWarning(false)} className="btn-dark flex-1">Stay</button>
               <button onClick={() => {
                 setStatus("lose");
-                const currentGameId = getSession("gameId") || gameId;
-                socket.emit("Resign", { roomId: effectiveRoomId, gameId: currentGameId, userId: effectiveUserId });
+                const gId = getSession("gameId") || gameId;
+                socket.emit("Resign", { roomId: effectiveRoomId, gameId: gId, userId: effectiveUserId });
                 setShowBackWarning(false);
-              }} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Finish Game</button>
+              }} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
+                style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
+                Resign & Leave
+              </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

@@ -2,7 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App.jsx';
-import ChessLandingPage from './LandPage.jsx';
 import ChessDashboard from './Dashboard.jsx';
 import LandPage from './LandPage2.jsx';
 import './index.css';

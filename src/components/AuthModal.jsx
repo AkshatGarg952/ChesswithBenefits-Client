@@ -5,183 +5,148 @@ import { useNavigate } from 'react-router-dom';
 const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    username: ''
-  });
+  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '', username: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
     try {
       const response = await fetch(
-        mode === 'login' ? `${import.meta.env.VITE_SERVER_URL}/api/users/login` : `${import.meta.env.VITE_SERVER_URL}/api/users/register`,
+        mode === 'login'
+          ? `${import.meta.env.VITE_SERVER_URL}/api/users/login`
+          : `${import.meta.env.VITE_SERVER_URL}/api/users/register`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         }
       );
-
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Something went wrong');
       const { user, token } = data;
       sessionStorage.setItem('token', token);
       sessionStorage.setItem('user', user._id);
       onSuccess(user);
-      navigate(`/dashboard`);
-    } catch (error) {
-      alert(error.message);
-    }
-
-    setTimeout(() => {
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setIsLoading(false);
-      onSuccess();
-    }, 1500);
+    }
   };
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
+      <div className="w-full max-w-md animate-scale-in" style={{
+        background: 'linear-gradient(145deg, rgba(18,15,28,0.98), rgba(12,10,20,0.99))',
+        border: '1px solid rgba(201,168,76,0.2)',
+        borderRadius: '1.5rem',
+        boxShadow: '0 40px 100px rgba(0,0,0,0.8), 0 0 60px rgba(201,168,76,0.05)',
+        overflow: 'hidden',
+      }}>
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 p-6 rounded-t-3xl">
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(139,105,20,0.1))',
+          borderBottom: '1px solid rgba(201,168,76,0.15)',
+          padding: '1.5rem',
+        }}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white/20 p-2 rounded-lg">
-                <Crown className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #c9a84c, #8b6914)', boxShadow: '0 0 20px rgba(201,168,76,0.3)' }}>
+                <Crown className="h-5 w-5 text-[#0a0a0f]" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {mode === 'login' ? 'Welcome Back' : 'Join ChessVoice'}
+                <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Cinzel, serif' }}>
+                  {mode === 'login' ? 'Welcome Back' : 'Join the Elite'}
                 </h2>
-                <p className="text-orange-100">
+                <p className="text-sm text-[rgba(220,210,185,0.5)]">
                   {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white/80 hover:text-white transition-colors"
-            >
-              <X className="h-6 w-6" />
+            <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+              onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.12)'}
+              onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.06)'}>
+              <X className="h-4 w-4 text-[rgba(220,210,185,0.8)]" />
             </button>
           </div>
         </div>
 
         {/* Form */}
         <div className="p-6">
+          {error && (
+            <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-300"
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Username
-                </label>
+                <label className="block text-sm font-medium text-[rgba(220,210,185,0.7)] mb-1.5">Username</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                    placeholder="Enter your username"
-                    required
-                  />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-[rgba(201,168,76,0.5)]" style={{width:'18px',height:'18px'}} />
+                  <input type="text" name="username" value={formData.username} onChange={handleInputChange}
+                    className="input-dark pl-10" placeholder="Your username" required />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-[rgba(220,210,185,0.7)] mb-1.5">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                  placeholder="Enter your email"
-                  required
-                />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[rgba(201,168,76,0.5)]" style={{width:'18px',height:'18px'}} />
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange}
+                  className="input-dark pl-10" placeholder="you@example.com" required />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-[rgba(220,210,185,0.7)] mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                  placeholder="Enter your password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[rgba(201,168,76,0.5)]" style={{width:'18px',height:'18px'}} />
+                <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleInputChange}
+                  className="input-dark pl-10 pr-11" placeholder="Your password" required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[rgba(201,168,76,0.5)] hover:text-[#c9a84c] transition-colors">
+                  {showPassword ? <EyeOff style={{width:'18px',height:'18px'}} /> : <Eye style={{width:'18px',height:'18px'}} />}
                 </button>
               </div>
             </div>
 
-
-
-
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <button type="submit" disabled={isLoading} className="btn-gold w-full justify-center flex items-center gap-2 mt-2" style={{opacity: isLoading ? 0.7 : 1}}>
               {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>{mode === 'login' ? 'Signing In...' : 'Creating Account...'}</span>
-                </div>
+                <>
+                  <div className="w-4 h-4 border-2 border-[#0a0a0f]/30 border-t-[#0a0a0f] rounded-full animate-spin" />
+                  {mode === 'login' ? 'Signing In...' : 'Creating Account...'}
+                </>
               ) : (
                 mode === 'login' ? 'Sign In' : 'Create Account'
               )}
             </button>
           </form>
 
-          {/* Switch Mode */}
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              {mode === 'login' ? "Don't have an account?" : "Already have an account?"}
-              <button
-                onClick={() => onSwitchMode(mode === 'login' ? 'register' : 'login')}
-                className="ml-1 text-orange-600 hover:text-orange-700 font-medium"
-              >
-                {mode === 'login' ? 'Sign up' : 'Sign in'}
-              </button>
-            </p>
-          </div>
+          <div className="divider-gold" />
 
+          <p className="text-center text-sm text-[rgba(220,210,185,0.5)]">
+            {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button onClick={() => onSwitchMode(mode === 'login' ? 'register' : 'login')}
+              className="text-[#c9a84c] hover:text-[#e0bd6a] font-semibold transition-colors">
+              {mode === 'login' ? 'Sign Up' : 'Sign In'}
+            </button>
+          </p>
         </div>
       </div>
     </div>

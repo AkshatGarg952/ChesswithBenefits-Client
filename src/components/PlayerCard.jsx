@@ -1,432 +1,289 @@
-import { Video, Crown, Clock, Mic, MicOff, VideoOff } from 'lucide-react';
+import { Video, Crown, Clock, Mic, MicOff, VideoOff, Wifi, WifiOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { socket } from "../socket/SocketConnection.js";
 
 const PlayerCard = ({
-    playerName,
-    initialTime = 600,
-    isActive,
-    isCurrentUser = false,
-    className = "",
-    color,
-    gameId,
-    onTimeExpired
+  playerName,
+  initialTime = 600,
+  isActive,
+  isCurrentUser = false,
+  className = "",
+  color,
+  gameId,
+  onTimeExpired,
+  compact = false,
 }) => {
-    const [time, setTime] = useState(initialTime);
+  const [time, setTime] = useState(initialTime);
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [hasGameStarted, setHasGameStarted] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [opponentSocketId, setOpponentSocketId] = useState(null);
 
-    useEffect(() => {
-        setTime(initialTime);
-    }, [initialTime]);
+  const opponentSocketIdRef = useRef(null);
+  const timerRef = useRef(null);
+  const peerRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const streamRef = useRef(null);
 
-    const [isMicEnabled, setIsMicEnabled] = useState(true);
-    const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-    const [hasGameStarted, setHasGameStarted] = useState(false);
-    const [stream, setStream] = useState(null);
-    const [opponentSocketId, setOpponentSocketId] = useState(null);
+  useEffect(() => { setTime(initialTime); }, [initialTime]);
+  useEffect(() => { opponentSocketIdRef.current = opponentSocketId; }, [opponentSocketId]);
 
-    // Ref for opponentSocketId to access current value in listeners without re-binding
-    const opponentSocketIdRef = useRef(null);
+  useEffect(() => {
+    if (isActive) {
+      timerRef.current = setInterval(() => setTime(prev => prev > 0 ? prev - 1 : 0), 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isActive]);
 
-    useEffect(() => {
-        opponentSocketIdRef.current = opponentSocketId;
-    }, [opponentSocketId]);
+  useEffect(() => {
+    if (!isActive) return;
+    const sync = setInterval(() => socket.emit("timer-update", { gameId, color, timeRemaining: time }), 5000);
+    return () => clearInterval(sync);
+  }, [isActive, time, gameId, color]);
 
-    const timerRef = useRef(null);
-    const peerRef = useRef(null);
-    const localVideoRef = useRef(null);
-    const remoteVideoRef = useRef(null);
-    const streamRef = useRef(null);
+  useEffect(() => {
+    const h = () => clearInterval(timerRef.current);
+    socket.on("gameOver", h);
+    return () => socket.off("gameOver", h);
+  }, []);
 
+  const formatTime = t => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  const isLowTime = time < 60;
 
-    useEffect(() => {
-        if (isActive) {
-            timerRef.current = setInterval(() => {
-                setTime((prev) => (prev > 0 ? prev - 1 : 0));
-            }, 1000);
-        } else {
-            clearInterval(timerRef.current);
-        }
-        return () => clearInterval(timerRef.current);
-    }, [isActive]);
+  const getSharedStream = async () => {
+    if (window.localChessStream?.active) return window.localChessStream;
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      window.localChessStream = s;
+      return s;
+    } catch { return null; }
+  };
 
-    useEffect(() => {
-        if (!isActive) return;
-        const syncInterval = setInterval(() => {
-            socket.emit("timer-update", {
-                gameId,
-                color,
-                timeRemaining: time,
-            });
-        }, 5000);
-        return () => clearInterval(syncInterval);
-    }, [isActive, time, gameId, color]);
+  const toggleMic = () => {
+    const s = window.localChessStream || streamRef.current;
+    if (s) {
+      const t = s.getAudioTracks()[0];
+      if (t) { t.enabled = !t.enabled; setIsMicEnabled(t.enabled); }
+    }
+  };
 
+  const toggleVideo = () => {
+    const s = window.localChessStream || streamRef.current;
+    if (s) {
+      const t = s.getVideoTracks()[0];
+      if (t) { t.enabled = !t.enabled; setIsVideoEnabled(t.enabled); }
+    }
+  };
 
-    useEffect(() => {
-        const handleGameOver = () => clearInterval(timerRef.current);
-        socket.on("gameOver", handleGameOver);
-        return () => socket.off("gameOver", handleGameOver);
-    }, []);
+  useEffect(() => {
+    const handleGameStart = async data => {
+      const { opponentSocketId: id } = data;
+      setHasGameStarted(true);
+      setOpponentSocketId(id);
+    };
+    socket.on("bothPlayersJoined", handleGameStart);
+    socket.on("opponentJoined", data => { setHasGameStarted(true); if (data.opponentSocketId) setOpponentSocketId(data.opponentSocketId); });
+    return () => { socket.off("bothPlayersJoined", handleGameStart); socket.off("opponentJoined"); };
+  }, []);
 
-    const formatTime = (t) => {
-        const minutes = Math.floor(t / 60);
-        const seconds = t % 60;
-        return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  useEffect(() => {
+    const setupLocal = async () => {
+      const s = await getSharedStream();
+      if (!s) return;
+      streamRef.current = s;
+      setStream(s);
+      if (localVideoRef.current) { localVideoRef.current.srcObject = s; localVideoRef.current.muted = true; }
+      const a = s.getAudioTracks()[0], v = s.getVideoTracks()[0];
+      if (a) setIsMicEnabled(a.enabled);
+      if (v) setIsVideoEnabled(v.enabled);
     };
 
-    // Shared stream acquisition helper
-    const getSharedStream = async () => {
-        if (window.localChessStream && window.localChessStream.active) {
-            return window.localChessStream;
-        }
+    if (isCurrentUser) { setupLocal(); return; }
 
-        try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            window.localChessStream = mediaStream;
-            return mediaStream;
-        } catch (e) {
-            console.error("Failed to get stream:", e);
-            return null;
-        }
+    let peer;
+    const setupCall = async () => await getSharedStream();
+
+    const handleIncoming = async ({ from, offer }) => {
+      if (opponentSocketIdRef.current && from !== opponentSocketIdRef.current) return;
+      if (peerRef.current) peerRef.current.close();
+      const s = await setupCall();
+      if (!s) return;
+      peer = new RTCPeerConnection();
+      peerRef.current = peer;
+      s.getTracks().forEach(t => peer.addTrack(t, s));
+      peer.onicecandidate = e => { if (e.candidate) socket.emit("ice-candidate", { targetSocketId: from, candidate: e.candidate }); };
+      peer.ontrack = e => { if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0]; };
+      await peer.setRemoteDescription(new RTCSessionDescription(offer));
+      const ans = await peer.createAnswer();
+      await peer.setLocalDescription(ans);
+      socket.emit("answer-call", { targetSocketId: from, answer: ans });
     };
 
-
-    const toggleMic = () => {
-        const s = window.localChessStream || streamRef.current;
-        if (s) {
-            const track = s.getAudioTracks()[0];
-            if (track) {
-                track.enabled = !track.enabled;
-                setIsMicEnabled(track.enabled);
-            }
-        }
+    const handleAnswered = async ({ answer }) => {
+      if (peerRef.current) try { await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer)); } catch {}
     };
 
-    const toggleVideo = () => {
-        const s = window.localChessStream || streamRef.current;
-        if (s) {
-            const track = s.getVideoTracks()[0];
-            if (track) {
-                track.enabled = !track.enabled;
-                setIsVideoEnabled(track.enabled);
-            }
-        }
+    const handleIce = async ({ candidate }) => {
+      if (peerRef.current) try { await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
     };
 
-    // Game start listener
-    useEffect(() => {
-        const handleGameStart = async (data) => {
-            console.log("???? Both players joined!", data);
-            const { opponentSocketId: receivedOpponentSocketId } = data;
-            setHasGameStarted(true);
-            setOpponentSocketId(receivedOpponentSocketId);
-        };
+    socket.on("incoming-call", handleIncoming);
+    socket.on("call-answered", handleAnswered);
+    socket.on("ice-candidate", handleIce);
 
-        socket.on("bothPlayersJoined", handleGameStart);
-        // Also listen for opponentJoined (for the player who was already there)
-        socket.on("opponentJoined", (data) => {
-            console.log("???? Opponent joined!", data);
-            setHasGameStarted(true);
-            if (data.opponentSocketId) {
-                setOpponentSocketId(data.opponentSocketId);
-            }
-        });
-
-        return () => {
-            socket.off("bothPlayersJoined", handleGameStart);
-            socket.off("opponentJoined");
-        };
-    }, []);
-
-    // WebRTC setup
-    useEffect(() => {
-        const setupLocalStreamForCurrentUser = async () => {
-            try {
-                const mediaStream = await getSharedStream();
-                if (!mediaStream) return;
-
-                streamRef.current = mediaStream;
-                setStream(mediaStream);
-
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = mediaStream;
-                    localVideoRef.current.muted = true;
-                }
-
-                const audioTrack = mediaStream.getAudioTracks()[0];
-                const videoTrack = mediaStream.getVideoTracks()[0];
-                if (audioTrack) setIsMicEnabled(audioTrack.enabled);
-                if (videoTrack) setIsVideoEnabled(videoTrack.enabled);
-
-                return mediaStream;
-            } catch (err) {
-                console.error("Error accessing media devices:", err);
-            }
-        };
-
-        if (isCurrentUser) {
-            setupLocalStreamForCurrentUser();
-            return;
+    if (opponentSocketId) {
+      (async () => {
+        if (color === 'black' && opponentSocketId) {
+          if (peerRef.current) peerRef.current.close();
+          const s = await setupCall();
+          if (s) {
+            const np = new RTCPeerConnection();
+            peerRef.current = np; peer = np;
+            s.getTracks().forEach(t => np.addTrack(t, s));
+            np.onicecandidate = e => { if (e.candidate) socket.emit("ice-candidate", { targetSocketId: opponentSocketId, candidate: e.candidate }); };
+            np.ontrack = e => { if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0]; };
+            const offer = await np.createOffer();
+            await np.setLocalDescription(offer);
+            socket.emit("call-user", { targetSocketId: opponentSocketId, offer });
+          }
         }
+      })();
+    }
 
-        // --- Connection Logic for Opponent Card ---
-
-        let peer;
-
-        // Helper to get stream for calling
-        const setupCallStream = async () => {
-            return await getSharedStream();
-        };
-
-        // --- STABLE EVENT HANDLERS ---
-        // These use refs to access current state without triggering re-effects
-
-        const handleIncomingCall = async ({ from, offer }) => {
-            const currentOpponentId = opponentSocketIdRef.current;
-
-            console.log(`???? Incoming call from: ${from}. Current Opponent: ${currentOpponentId}`);
-
-            // Basic validation: Is this call from the person we think is our opponent?
-            // Or if we don't have an opponent yet, maybe we accept it? 
-            // Safer to accept if it matches or if we are waiting.
-            if (currentOpponentId && from !== currentOpponentId) {
-                console.warn("Mismatch in opponent ID. Ignoring.");
-                return;
-            }
-
-            if (peerRef.current) {
-                peerRef.current.close();
-            }
-
-            const mediaStream = await setupCallStream();
-            if (!mediaStream) return;
-
-            peer = new RTCPeerConnection();
-            peerRef.current = peer;
-
-            mediaStream.getTracks().forEach(track => peer.addTrack(track, mediaStream));
-
-            peer.onicecandidate = e => {
-                if (e.candidate) {
-                    socket.emit("ice-candidate", {
-                        targetSocketId: from,
-                        candidate: e.candidate
-                    });
-                }
-            };
-
-            peer.ontrack = e => {
-                if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = e.streams[0];
-                }
-            };
-
-            await peer.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await peer.createAnswer();
-            await peer.setLocalDescription(answer);
-
-            socket.emit("answer-call", {
-                targetSocketId: from,
-                answer
-            });
-        };
-
-        const handleCallAnswered = async ({ answer }) => {
-            if (peerRef.current) {
-                try {
-                    await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-                } catch (e) {
-                    console.error("Set remote desc error", e);
-                }
-            }
-        };
-
-        const handleIceCandidate = async ({ candidate }) => {
-            if (peerRef.current) {
-                try {
-                    await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (err) {
-                    console.error("ICE error", err);
-                }
-            }
-        };
-
-        // Register Listeners ONCE
-        socket.on("incoming-call", handleIncomingCall);
-        socket.on("call-answered", handleCallAnswered);
-        socket.on("ice-candidate", handleIceCandidate);
-
-        // Initiation Logic (Triggered when opponentSocketId changes)
-        const initiateCall = async () => {
-            if (color === 'black' && opponentSocketId) {
-                console.log("??? Initiating call to:", opponentSocketId);
-
-                if (peerRef.current) peerRef.current.close();
-
-                const mediaStream = await setupCallStream();
-                if (mediaStream) {
-                    const newPeer = new RTCPeerConnection();
-                    peerRef.current = newPeer;
-                    peer = newPeer;
-
-                    mediaStream.getTracks().forEach(track => newPeer.addTrack(track, mediaStream));
-
-                    newPeer.onicecandidate = e => {
-                        if (e.candidate) {
-                            socket.emit("ice-candidate", {
-                                targetSocketId: opponentSocketId,
-                                candidate: e.candidate
-                            });
-                        }
-                    };
-
-                    newPeer.ontrack = e => {
-                        if (remoteVideoRef.current) {
-                            remoteVideoRef.current.srcObject = e.streams[0];
-                        }
-                    };
-
-                    const offer = await newPeer.createOffer();
-                    await newPeer.setLocalDescription(offer);
-
-                    socket.emit("call-user", {
-                        targetSocketId: opponentSocketId,
-                        offer
-                    });
-                }
-            }
-        };
-
-        if (opponentSocketId) {
-            initiateCall();
-        }
-
-        return () => {
-            // Clean up listeners when component unmounts
-            socket.off("incoming-call", handleIncomingCall);
-            socket.off("call-answered", handleCallAnswered);
-            socket.off("ice-candidate", handleIceCandidate);
-
-            if (peerRef.current) {
-                peerRef.current.close();
-                peerRef.current = null;
-            }
-            setStream(null);
-        };
-
-        // Vital: We only re-run this effect if `opponentSocketId` (initiation target) changes. 
-        // We do NOT include mic/video state.
-    }, [opponentSocketId, isCurrentUser, color]);
-
-    // ... (Render Helpers) ...
-    const getConnectionStatus = () => {
-        if (!opponentSocketId) return "???? Waiting for opponent...";
-        if (!hasGameStarted) return "??? Waiting for game start...";
-        if (isCurrentUser) return "???? Your video";
-        if (color === 'white') return "???? White Player";
-        else if (color === 'black') return "??? Black Player";
-        return "???? Ready";
+    return () => {
+      socket.off("incoming-call", handleIncoming);
+      socket.off("call-answered", handleAnswered);
+      socket.off("ice-candidate", handleIce);
+      if (peerRef.current) { peerRef.current.close(); peerRef.current = null; }
+      setStream(null);
     };
+  }, [opponentSocketId, isCurrentUser, color]);
 
+  const pieceSymbol = color === 'white' ? '♔' : '♚';
+  const connected = isCurrentUser ? !!stream : !!opponentSocketId;
+
+  // ── COMPACT MODE (mobile) ─────────────────────────────────────────────
+  if (compact) {
     return (
-        <div className={`bg-white rounded-xl lg:rounded-2xl p-2 lg:p-4 border-2 transition-all duration-300 ${isActive
-            ? 'border-orange-400 shadow-lg shadow-orange-100 ring-2 ring-orange-200'
-            : 'border-gray-200 shadow-md'
-            } ${className}`}>
-            {/* Player Info */}
-            <div className="flex items-center justify-between mb-1.5 lg:mb-4">
-                <div className="flex items-center space-x-1 lg:space-x-2">
-                    <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${isActive ? 'bg-orange-500 animate-pulse' : 'bg-gray-400'
-                        }`} />
-                    <span className="font-semibold text-gray-800 text-xs lg:text-base">{playerName}</span>
-                    {isCurrentUser && <Crown className="w-3 h-3 lg:w-4 lg:h-4 text-yellow-500" />}
-                    <div className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full ${color === 'white' ? 'bg-gray-200 border border-gray-400' : 'bg-gray-800'
-                        }`} title={`${color} pieces`} />
-                    <span className="text-xs text-gray-500">{getConnectionStatus()}</span>
-                </div>
-                <div className={`flex items-center space-x-1 ${isActive ? 'text-orange-600' : 'text-gray-600'
-                    }`}>
-                    <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
-                    <span className={`font-mono font-bold text-xs lg:text-sm ${time < 60 ? 'text-red-500 animate-pulse' : ''
-                        }`}>{formatTime(time)}</span>
-                </div>
+      <div className={`player-card ${isActive ? 'active' : ''} ${className}`}
+        style={{ padding: '0.5rem 0.625rem' }}>
+        <div className="flex items-center justify-between gap-1.5">
+          {/* Avatar + name */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="relative w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
+              style={{ background: isActive ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(201,168,76,0.15)' }}>
+              <span style={{ filter: 'drop-shadow(0 0 4px rgba(201,168,76,0.4))' }}>{pieceSymbol}</span>
+              {isCurrentUser && <Crown className="absolute -top-1.5 -right-1.5 h-3 w-3 text-[#c9a84c]" fill="#c9a84c" />}
             </div>
-
-            {/* Video Call Area */}
-            <div
-                className={`aspect-video relative rounded-lg lg:rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-all duration-300 ${isActive ? "border-orange-300 bg-orange-50" : "border-gray-300 bg-gray-50"
-                    }`}
-            >
-                {isCurrentUser ? (
-                    <video
-                        ref={localVideoRef}
-                        autoPlay
-                        playsInline
-                        muted={true}
-                        className="w-full h-full object-cover rounded-lg"
-                    />
-                ) : (
-                    <>
-                        <video
-                            ref={remoteVideoRef}
-                            autoPlay
-                            playsInline
-                            muted={false}
-                            className="w-full h-full object-cover rounded-lg"
-                        />
-                    </>
-                )}
-
-                {((isCurrentUser && !stream) || (!isCurrentUser && !remoteVideoRef.current?.srcObject)) && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                        <div className="text-4xl mb-2">
-                            {isCurrentUser ? '????' : (color === 'white' ? '????' : '???')}
-                        </div>
-                        <p className="text-sm font-medium">
-                            {isCurrentUser
-                                ? 'Your Video'
-                                : (color === 'white' ? 'White Player' : 'Black Player')
-                            }
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                            {isCurrentUser
-                                ? 'Local Stream'
-                                : 'Waiting for connection...'
-                            }
-                        </p>
-                    </div>
-                )}
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold truncate" style={{ color: isActive ? '#e8e0d0' : 'rgba(220,210,185,0.6)', lineHeight: 1.2, maxWidth: '80px' }}>{playerName}</p>
+              <p className="text-[9px] capitalize" style={{ color: 'rgba(201,168,76,0.5)' }}>{color}</p>
             </div>
-
-            {/* Controls */}
-            {isCurrentUser && (stream || streamRef.current) && (
-                <div className="mt-2 flex justify-center space-x-3 flex-wrap">
-                    <button
-                        onClick={toggleMic}
-                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full shadow m-1 transition-colors"
-                        title={isMicEnabled ? "Mute Mic" : "Unmute Mic"}
-                    >
-                        {isMicEnabled ? (
-                            <Mic className="w-5 h-5 text-green-600" />
-                        ) : (
-                            <MicOff className="w-5 h-5 text-red-500" />
-                        )}
-                    </button>
-                    <button
-                        onClick={toggleVideo}
-                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full shadow m-1 transition-colors"
-                        title={isVideoEnabled ? "Turn Off Video" : "Turn On Video"}
-                    >
-                        {isVideoEnabled ? (
-                            <Video className="w-5 h-5 text-green-600" />
-                        ) : (
-                            <VideoOff className="w-5 h-5 text-red-500" />
-                        )}
-                    </button>
-                </div>
-            )}
+          </div>
+          {/* Timer */}
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg font-mono font-bold text-xs transition-all shrink-0`}
+            style={{
+              background: isLowTime ? 'rgba(248,113,113,0.15)' : isActive ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${isLowTime ? 'rgba(248,113,113,0.3)' : isActive ? 'rgba(201,168,76,0.25)' : 'rgba(255,255,255,0.08)'}`,
+              color: isLowTime ? '#f87171' : isActive ? '#c9a84c' : 'rgba(220,210,185,0.5)',
+            }}>
+            <Clock style={{ width: '10px', height: '10px' }} />
+            <span className={isLowTime && isActive ? 'animate-pulse' : ''}>{formatTime(time)}</span>
+          </div>
         </div>
+        {/* Active indicator strip */}
+        {isActive && (
+          <div className="mt-1.5 h-0.5 rounded-full" style={{ background: 'linear-gradient(90deg, rgba(201,168,76,0.5), rgba(201,168,76,0.15))' }} />
+        )}
+      </div>
     );
+  }
+
+  // ── FULL MODE (tablet / desktop) ──────────────────────────────────────
+  return (
+    <div className={`player-card ${isActive ? 'active' : ''} ${className}`}
+      style={{ padding: '0.875rem' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          {/* Avatar */}
+          <div className="relative w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+            style={{ background: isActive ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(201,168,76,0.15)' }}>
+            <span style={{ filter: 'drop-shadow(0 0 4px rgba(201,168,76,0.4))' }}>{pieceSymbol}</span>
+            {isCurrentUser && <Crown className="absolute -top-1.5 -right-1.5 h-3 w-3 text-[#c9a84c]" fill="#c9a84c" />}
+          </div>
+          <div>
+            <p className="text-xs font-semibold" style={{ color: isActive ? '#e8e0d0' : 'rgba(220,210,185,0.6)', lineHeight: 1.2 }}>{playerName}</p>
+            <p className="text-[10px] capitalize" style={{ color: 'rgba(201,168,76,0.5)' }}>{color}</p>
+          </div>
+        </div>
+        {/* Timer */}
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg font-mono font-bold text-sm transition-all`}
+          style={{
+            background: isLowTime ? 'rgba(248,113,113,0.15)' : isActive ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${isLowTime ? 'rgba(248,113,113,0.3)' : isActive ? 'rgba(201,168,76,0.25)' : 'rgba(255,255,255,0.08)'}`,
+            color: isLowTime ? '#f87171' : isActive ? '#c9a84c' : 'rgba(220,210,185,0.5)',
+          }}>
+          <Clock style={{ width: '11px', height: '11px' }} />
+          <span className={isLowTime && isActive ? 'animate-pulse' : ''}>{formatTime(time)}</span>
+        </div>
+      </div>
+
+      {/* Video area */}
+      <div className="relative rounded-xl overflow-hidden" style={{
+        aspectRatio: '4/3',
+        background: 'rgba(0,0,0,0.4)',
+        border: isActive ? '1px solid rgba(201,168,76,0.25)' : '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {isCurrentUser ? (
+          <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+        ) : (
+          <video ref={remoteVideoRef} autoPlay playsInline muted={false} className="w-full h-full object-cover" />
+        )}
+
+        {/* Placeholder overlay */}
+        {((isCurrentUser && !stream) || (!isCurrentUser && !remoteVideoRef.current?.srcObject)) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <span className="text-3xl opacity-30">{pieceSymbol}</span>
+            <p className="text-[10px] font-medium" style={{ color: 'rgba(220,210,185,0.35)' }}>
+              {isCurrentUser ? 'Your Video' : `Waiting...`}
+            </p>
+          </div>
+        )}
+
+        {/* Active indicator */}
+        {isActive && (
+          <div className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+            style={{ background: 'rgba(74,222,128,0.2)', border: '1px solid rgba(74,222,128,0.3)' }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-[9px] text-green-400 font-medium">TURN</span>
+          </div>
+        )}
+      </div>
+
+      {/* Controls */}
+      {isCurrentUser && (stream || streamRef.current) && (
+        <div className="mt-2 flex justify-center gap-2">
+          <button onClick={toggleMic}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+            style={{ background: isMicEnabled ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', border: `1px solid ${isMicEnabled ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}
+            title={isMicEnabled ? "Mute" : "Unmute"}>
+            {isMicEnabled ? <Mic style={{ width: '14px', height: '14px', color: '#4ade80' }} /> : <MicOff style={{ width: '14px', height: '14px', color: '#f87171' }} />}
+          </button>
+          <button onClick={toggleVideo}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+            style={{ background: isVideoEnabled ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', border: `1px solid ${isVideoEnabled ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}` }}
+            title={isVideoEnabled ? "Turn Off Video" : "Turn On Video"}>
+            {isVideoEnabled ? <Video style={{ width: '14px', height: '14px', color: '#4ade80' }} /> : <VideoOff style={{ width: '14px', height: '14px', color: '#f87171' }} />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default PlayerCard;

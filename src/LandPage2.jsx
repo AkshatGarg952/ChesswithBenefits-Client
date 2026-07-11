@@ -11,7 +11,7 @@ import Footer from './components/Footer';
 
 function LandPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen" style={{ background: '#0a0a0f' }}>
       <Navbar />
       <Hero />
       <Features />

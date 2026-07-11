@@ -61,6 +61,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
         body: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
+        cinzel: ['Cinzel', 'serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',

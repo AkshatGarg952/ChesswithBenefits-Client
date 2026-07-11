@@ -1,137 +1,81 @@
 import React from 'react';
 import { Star, Quote } from 'lucide-react';
 
-const Testimonials = () => {
-  const testimonials = [
-    {
-      name: "Alex Chen",
-      role: "Chess Master",
-      avatar: "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1",
-      rating: 5,
-      content: "The AI commentary is absolutely brilliant! It's like having a grandmaster explain every move in real-time. The voice control feature is game-changing.",
-      highlight: "AI commentary is absolutely brilliant!"
-    },
-    {
-      name: "Sarah Williams",
-      role: "Tournament Player",
-      avatar: "https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1",
-      rating: 5,
-      content: "Playing chess with friends while on video call brings back the social aspect of the game. The move analysis helps me understand my mistakes instantly.",
-      highlight: "Brings back the social aspect of chess"
-    },
-    {
-      name: "Michael Rodriguez",
-      role: "Chess Enthusiast",
-      avatar: "https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1",
-      rating: 5,
-      content: "I've been playing chess for years, but this platform took my game to the next level. The different commentary modes keep every game interesting and educational.",
-      highlight: "Took my game to the next level"
-    },
-    {
-      name: "Emma Thompson",
-      role: "Chess Coach",
-      avatar: "https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1",
-      rating: 5,
-      content: "As a coach, I love how this platform helps my students learn. The move quality analysis is perfect for teaching chess principles and tactical patterns.",
-      highlight: "Perfect for teaching chess principles"
-    },
-    {
-      name: "David Kim",
-      role: "Software Developer",
-      avatar: "https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1",
-      rating: 5,
-      content: "The voice commands work flawlessly! I can play during breaks without even touching my mouse. The technology behind this is impressive.",
-      highlight: "Voice commands work flawlessly!"
-    },
-    {
-      name: "Lisa Anderson",
-      role: "Chess Streamer",
-      avatar: "https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=1",
-      rating: 5,
-      content: "My viewers love the entertaining commentary mode! It makes my streams more engaging and helps explain complex positions in a fun way.",
-      highlight: "Makes streams more engaging"
-    }
-  ];
+const testimonials = [
+  { name: "Alex Chen",         role: "Chess Master",      avatar: "AC", color: '#c9a84c', rating: 5, content: "The AI commentary is absolutely brilliant! It's like having a grandmaster explain every move. The voice control feature is completely game-changing.", highlight: "Like having a grandmaster by your side" },
+  { name: "Sarah Williams",    role: "Tournament Player", avatar: "SW", color: '#60a5fa', rating: 5, content: "Playing chess while on video call brings back the social aspect of the game. The move analysis helps me understand my mistakes instantly.", highlight: "Brings back the social essence of chess" },
+  { name: "Michael Rodriguez", role: "Chess Enthusiast",  avatar: "MR", color: '#4ade80', rating: 5, content: "I've played chess for years, but this platform took my game to the next level. Different commentary modes keep every game interesting and educational.", highlight: "Took my game to the next level" },
+  { name: "Emma Thompson",     role: "Chess Coach",       avatar: "ET", color: '#c084fc', rating: 5, content: "As a coach, I love how this platform helps my students learn. The move quality analysis is perfect for teaching chess principles.", highlight: "Perfect for teaching chess principles" },
+  { name: "David Kim",         role: "Software Dev",      avatar: "DK", color: '#fb923c', rating: 5, content: "Voice commands work flawlessly! I can play without even touching my mouse. The technology behind this is impressive.", highlight: "Voice commands work flawlessly!" },
+  { name: "Lisa Anderson",     role: "Chess Streamer",    avatar: "LA", color: '#34d399', rating: 5, content: "My viewers love the entertaining commentary mode! It makes streams more engaging and helps explain complex positions in a fun way.", highlight: "Makes every stream more engaging" },
+];
 
-  return (
-    <section id="testimonials" className="py-20 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            What Chess Players Say
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Join thousands of chess enthusiasts who have transformed their game 
-            with our revolutionary chess platform.
-          </p>
-        </div>
+const stats = [
+  { val: '10K+', label: 'Active Players' },
+  { val: '50K+', label: 'Games Played' },
+  { val: '4.9★', label: 'Avg. Rating' },
+  { val: '95%',  label: 'Satisfaction' },
+];
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100"
-            >
-              {/* Quote Icon */}
-              <div className="flex justify-between items-start mb-4">
-                <Quote className="h-8 w-8 text-orange-500 opacity-20" />
-                <div className="flex space-x-1">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-              </div>
+const Testimonials = () => (
+  <section id="testimonials" style={{ background: '#0a0a0f', paddingTop: '6rem', paddingBottom: '6rem', position: 'relative' }}>
+    <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(201,168,76,0.03) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-              {/* Content */}
-              <p className="text-gray-700 mb-6 leading-relaxed">
-                {testimonial.content}
-              </p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="text-center mb-16">
+        <span className="badge-gold mb-4 inline-flex"><span>⭐</span> Testimonials</span>
+        <h2 className="text-4xl md:text-5xl font-black mt-4 mb-5 text-white" style={{ fontFamily: 'Cinzel, serif' }}>What Players Say</h2>
+        <p className="text-lg max-w-2xl mx-auto" style={{ color: 'rgba(220,210,185,0.5)' }}>
+          Thousands of chess players have transformed their game with our platform.
+        </p>
+      </div>
 
-              {/* Highlight */}
-              <div className="bg-orange-50 rounded-lg p-3 mb-4 border-l-4 border-orange-500">
-                <p className="text-orange-800 font-medium text-sm">
-                  "{testimonial.highlight}"
-                </p>
-              </div>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+        {testimonials.map(({ name, role, avatar, color, rating, content, highlight }, i) => (
+          <div key={i} className="rounded-2xl p-6 transition-all duration-300"
+            style={{ background: 'linear-gradient(145deg, rgba(18,15,28,0.9), rgba(12,10,20,0.95))', border: '1px solid rgba(201,168,76,0.1)', animationDelay: `${i * 60}ms` }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = `${color}30`; e.currentTarget.style.boxShadow = `0 20px 50px rgba(0,0,0,0.5)`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(201,168,76,0.1)'; e.currentTarget.style.boxShadow = ''; }}>
 
-              {/* Author */}
-              <div className="flex items-center space-x-3">
-                <img
-                  src={testimonial.avatar}
-                  alt={testimonial.name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                <div>
-                  <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                  <p className="text-sm text-gray-500">{testimonial.role}</p>
-                </div>
+            <div className="flex items-center justify-between mb-4">
+              <Quote style={{ width: '20px', height: '20px', color: 'rgba(201,168,76,0.2)' }} />
+              <div className="flex gap-0.5">
+                {[...Array(rating)].map((_, i) => <Star key={i} style={{ width: '12px', height: '12px', color: '#c9a84c', fill: '#c9a84c' }} />)}
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Stats */}
-        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-600 mb-2">10K+</div>
-            <div className="text-gray-600">Active Players</div>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: 'rgba(220,210,185,0.65)' }}>{content}</p>
+
+            <div className="rounded-xl px-3 py-2 mb-4 border-l-2" style={{ background: `${color}0d`, borderColor: `${color}50` }}>
+              <p className="text-xs font-semibold italic" style={{ color }}>&ldquo;{highlight}&rdquo;</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-[#0a0a0f]"
+                style={{ background: `linear-gradient(135deg, ${color}, ${color}80)` }}>
+                {avatar}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">{name}</p>
+                <p className="text-xs" style={{ color: 'rgba(220,210,185,0.4)' }}>{role}</p>
+              </div>
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-600 mb-2">50K+</div>
-            <div className="text-gray-600">Games Played</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-600 mb-2">4.9</div>
-            <div className="text-gray-600">Average Rating</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-600 mb-2">95%</div>
-            <div className="text-gray-600">Satisfaction Rate</div>
-          </div>
-        </div>
+        ))}
       </div>
-    </section>
-  );
-};
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden"
+        style={{ background: 'rgba(201,168,76,0.1)', boxShadow: '0 0 40px rgba(201,168,76,0.06)' }}>
+        {stats.map(({ val, label }) => (
+          <div key={label} className="text-center py-8 px-4" style={{ background: 'linear-gradient(145deg, rgba(15,13,24,0.98), rgba(10,10,18,1))' }}>
+            <p className="text-3xl font-black mb-1" style={{ background: 'linear-gradient(135deg, #f5e6c3, #c9a84c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{val}</p>
+            <p className="text-xs tracking-wider uppercase" style={{ color: 'rgba(220,210,185,0.45)' }}>{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
 
 export default Testimonials;

@@ -4,16 +4,17 @@ import Confetti from 'react-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { Mic, MicOff, Handshake, Flag, RotateCcw, LayoutDashboard } from 'lucide-react';
 
 const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, handleDraw, handleResign, gameStarted, currentPlayer }) => {
   const isBlack = color === "black";
   const navigate = useNavigate();
-  const [windowSize, setWindowSize] = useState({ width: 300, height: 300 });
-
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [boardWidth, setBoardWidth] = useState(300);
+  const containerRef = useRef(null);
   const [recording, setRecording] = useState(false);
   const [spokenText, setSpokenText] = useState("");
   const [networkErrorOccurred, setNetworkErrorOccurred] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [browserInfo, setBrowserInfo] = useState("");
@@ -21,607 +22,324 @@ const ChessBoard = ({ className = "", color, onMove, gameState, status, mode, ha
   const spokenTextRef = useRef("");
   const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
-  const maxRetries = 3;
 
+  // Track confetti window size
   useEffect(() => {
-    setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    const h = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
   }, []);
 
-  // Detect Brave browser
+  // Dynamically measure container width for the board
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const w = Math.floor(entry.contentRect.width);
+        if (w > 0) setBoardWidth(w);
+      }
+    });
+    observer.observe(containerRef.current);
+    // Initial measurement
+    const w = Math.floor(containerRef.current.getBoundingClientRect().width);
+    if (w > 0) setBoardWidth(w);
+    return () => observer.disconnect();
+  }, []);
 
   const onDrop = useCallback((from, to) => {
     const copy = new Chess(gameState.fen());
     const move = copy.move({ from, to, promotion: "q" });
-    if (move) {
-      onMove(move, copy);
-      return true;
-    }
+    if (move) { onMove(move, copy); return true; }
     return false;
   }, [gameState, onMove]);
 
-
   const detectBrave = useCallback(async () => {
-    // Method 1: Direct brave detection
-    if (navigator.brave && navigator.brave.isBrave) {
-      return true;
-    }
-
-    // Method 2: Feature detection for Brave
-    try {
-      if (navigator.brave) {
-        const isBrave = await navigator.brave.isBrave();
-        if (isBrave) return true;
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-
-    // Method 3: User agent hints (fallback)
-    if (navigator.userAgent.includes('Brave')) {
-      return true;
-    }
-
-    return false;
+    if (navigator.brave?.isBrave) return true;
+    try { if (navigator.brave) { const b = await navigator.brave.isBrave(); if (b) return true; } } catch {}
+    return navigator.userAgent.includes('Brave');
   }, []);
 
-  // Get browser info for debugging
   const getBrowserInfo = useCallback(() => {
-    const userAgent = navigator.userAgent;
-    if (userAgent.includes('Chrome') && !userAgent.includes('Edge')) {
-      return "Chrome";
-    } else if (userAgent.includes('Edge')) {
-      return "Edge (Limited Support)";
-    } else if (userAgent.includes('Firefox')) {
-      return "Firefox (Not Supported)";
-    } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
-      return "Safari (Limited Support)";
-    } else {
-      return "Unknown Browser";
-    }
+    const ua = navigator.userAgent;
+    if (ua.includes('Chrome') && !ua.includes('Edge')) return "Chrome";
+    if (ua.includes('Edge')) return "Edge";
+    if (ua.includes('Firefox')) return "Firefox";
+    if (ua.includes('Safari') && !ua.includes('Chrome')) return "Safari";
+    return "Unknown";
   }, []);
 
-  // Check if speech recognition is supported
   const checkSpeechSupport = useCallback(async () => {
-    // Check if it's Brave browser
-    const isBrave = await detectBrave();
-    if (isBrave) {
-      setBrowserInfo("Brave Browser (Blocks Speech for Privacy)");
-      return false;
-    }
-
-    // Set browser info
+    if (await detectBrave()) { setBrowserInfo("Brave (Blocks Speech)"); return false; }
     setBrowserInfo(getBrowserInfo());
-
-    const hasWebkit = 'webkitSpeechRecognition' in window;
-    const hasStandard = 'SpeechRecognition' in window;
-
-    const isSupported = hasWebkit || hasStandard;
-
-    if (!isSupported) {
-      return false;
-    }
-
-    // Check secure context - be more permissive for development
-    const isSecure = window.location.protocol === 'https:' ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname === '0.0.0.0' ||
-      window.location.hostname.startsWith('192.168.') ||
-      window.location.hostname.startsWith('10.') ||
-      window.location.hostname.includes('.local');
-
-    if (!isSecure) {
-      console.warn("Speech recognition requires HTTPS or localhost");
-      setBrowserInfo(getBrowserInfo() + " (Requires HTTPS)");
-      return false;
-    }
-
-    // Try to create an instance to verify it really works
+    const supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    if (!supported) return false;
+    const secure = ['https:', 'http:'].includes(window.location.protocol) ||
+      ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (!secure) return false;
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const testRecognition = new SpeechRecognition();
-
-      // Test basic properties
-      testRecognition.continuous = false;
-      testRecognition.interimResults = false;
-      testRecognition.lang = 'en-US';
-
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      new SR();
       return true;
-    } catch (error) {
-      console.error("Failed to create SpeechRecognition instance:", error);
-      setBrowserInfo(getBrowserInfo() + " (API Error)");
-      return false;
-    }
+    } catch { return false; }
   }, [detectBrave, getBrowserInfo]);
 
-  // Test network connectivity to speech service
   const testSpeechService = useCallback(async () => {
     try {
-      // Test if we can reach Google's speech service
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch('https://www.google.com/favicon.ico', {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
+      const c = new AbortController();
+      setTimeout(() => c.abort(), 5000);
+      await fetch('https://www.google.com/favicon.ico', { method: 'HEAD', mode: 'no-cors', signal: c.signal });
       return true;
-    } catch (error) {
-      console.warn("Network connectivity test failed:", error);
-      return false;
-    }
+    } catch { return false; }
   }, []);
 
-  // Initialize speech recognition
   useEffect(() => {
-    const initializeSpeech = async () => {
-      const isSupported = await checkSpeechSupport();
-      setSpeechSupported(isSupported);
-
-      if (!isSupported) {
-        console.warn("Speech recognition not supported");
-        return;
-      }
-
+    const init = async () => {
+      const sup = await checkSpeechSupport();
+      setSpeechSupported(sup);
+      if (!sup) return;
       try {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-
-        // Configure recognition with stable settings
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
-        recognition.maxAlternatives = 1;
-
-        recognitionRef.current = recognition;
-
-        // Test network connectivity on initialization
-        testSpeechService().then(connected => {
-          if (!connected) {
-            console.warn("Speech service connectivity test failed");
-            setNetworkErrorOccurred(true);
-          }
-        });
-
-      } catch (error) {
-        console.error("Error initializing speech recognition:", error);
-        setSpeechSupported(false);
-      }
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const r = new SR();
+        r.continuous = false; r.interimResults = false; r.lang = 'en-US'; r.maxAlternatives = 1;
+        recognitionRef.current = r;
+        testSpeechService().then(ok => { if (!ok) setNetworkErrorOccurred(true); });
+      } catch { setSpeechSupported(false); }
     };
-
-    initializeSpeech();
-
-    // Cleanup on unmount
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (error) {
-          console.error("Error cleaning up recognition:", error);
-        }
-        recognitionRef.current = null;
-      }
-    };
+    init();
+    return () => { if (recognitionRef.current) try { recognitionRef.current.abort(); } catch {} };
   }, [checkSpeechSupport, testSpeechService]);
 
-  // Request microphone permission
-  const requestMicrophonePermission = useCallback(async () => {
+  const requestMicPermission = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach(t => t.stop());
       setPermissionGranted(true);
       return true;
-    } catch (error) {
-      console.error("Microphone permission error:", error);
+    } catch (e) {
       setPermissionGranted(false);
-
-      if (error.name === 'NotAllowedError') {
-        alert("Microphone access denied. Please allow microphone permissions and try again.");
-      } else if (error.name === 'NotFoundError') {
-        alert("No microphone found. Please connect a microphone and try again.");
-      } else {
-        alert("Error accessing microphone. Please check your microphone settings.");
-      }
+      if (e.name === 'NotAllowedError') alert("Microphone access denied.");
+      else if (e.name === 'NotFoundError') alert("No microphone found.");
+      else alert("Microphone error.");
       return false;
     }
   }, []);
 
   const parseSpokenMove = useCallback((text) => {
     if (!text) return null;
-
-    const wordToNum = {
-      one: "1", two: "2", three: "3", four: "4",
-      five: "5", six: "6", seven: "7", eight: "8",
-      ate: "8", to: "2", too: "2", for: "4", fore: "4"
-    };
-
-    let cleaned = text.toLowerCase()
-      .replace(/\b(one|two|three|four|five|six|seven|eight|ate|to|too|for|fore)\b/g, match => wordToNum[match] || match)
-      .replace(/[^a-h1-8\s]/g, "")
-      .replace(/\s+/g, "");
-
-
-
-    const squares = cleaned.match(/[a-h][1-8]/g);
-    if (squares && squares.length >= 2) {
-      const move = { from: squares[0], to: squares[1], promotion: "q" };
-
-      return move;
-    }
-
-    console.warn(`Could not find a valid move in text: "${text}" (cleaned: "${cleaned}")`);
-    return null;
+    const map = { one:"1",two:"2",three:"3",four:"4",five:"5",six:"6",seven:"7",eight:"8",ate:"8",to:"2",too:"2",for:"4",fore:"4" };
+    let c = text.toLowerCase()
+      .replace(/\b(one|two|three|four|five|six|seven|eight|ate|to|too|for|fore)\b/g, m => map[m] || m)
+      .replace(/[^a-h1-8\s]/g, "").replace(/\s+/g, "");
+    const sq = c.match(/[a-h][1-8]/g);
+    return sq?.length >= 2 ? { from: sq[0], to: sq[1], promotion: "q" } : null;
   }, []);
 
-  // const processVoiceCommand = useCallback((text) => {
-  //   console.log("Processing voice command:", text);
-  //   const move = parseSpokenMove(text);
-  //   if (move) {
-  //     const copy = new Chess(gameState.fen());
-  //     const result = copy.move(move);
-  //     if (result) {
-  //       console.log("Valid move executed:", result);
-  //       onMove(result, copy);
-  //       setNetworkErrorOccurred(false);
-  //       setRetryCount(0);
-  //     } else {
-  //       console.warn("Invalid or illegal move:", move);
-  //       alert(`Invalid move: ${move.from} to ${move.to}. Please try again.`);
-  //     }
-  //   } else {
-  //     alert(`Could not understand the move from: "${text}". Please say something like "e2 to e4"`);
-  //   }
-  // }, [gameState, onMove, parseSpokenMove]);
-
   const processVoiceCommand = useCallback((text) => {
-
     const move = parseSpokenMove(text);
     if (move) {
-      // Call onDrop instead of duplicating the logic
-      const success = onDrop(move.from, move.to);
-      if (success) {
-
-        setNetworkErrorOccurred(false);
-        setRetryCount(0);
-      } else {
-        console.warn("Invalid or illegal move:", move);
-        alert(`Invalid move: ${move.from} to ${move.to}. Please try again.`);
-      }
+      const ok = onDrop(move.from, move.to);
+      if (ok) { setNetworkErrorOccurred(false); }
+      else alert(`Invalid move: ${move.from} to ${move.to}`);
     } else {
-      alert(`Could not understand the move from: "${text}". Please say something like "e2 to e4"`);
+      alert(`Could not parse: "${text}". Say something like "e2 to e4"`);
     }
-  }, [onDrop, parseSpokenMove]); // Remove gameState and onMove from dependencies, add onDrop
-
+  }, [onDrop, parseSpokenMove]);
 
   const startListening = useCallback(async () => {
-
-
-    if (isRecordingRef.current || !recognitionRef.current) {
-
-      return;
-    }
-
-    // Reset error states
+    if (isRecordingRef.current || !recognitionRef.current) return;
     setNetworkErrorOccurred(false);
-
-    // Test network connectivity first
-
-    const isConnected = await testSpeechService();
-    if (!isConnected) {
-      console.error("Network connectivity test failed");
-      setNetworkErrorOccurred(true);
-      alert("Network error: Cannot connect to speech recognition service. Please check your internet connection and try again.");
-      return;
-    }
-
-
-    // Check permissions
-
-    const hasPermission = await requestMicrophonePermission();
-    if (!hasPermission) {
-
-      return;
-    }
-
+    const connected = await testSpeechService();
+    if (!connected) { setNetworkErrorOccurred(true); return; }
+    const hasPerm = await requestMicPermission();
+    if (!hasPerm) return;
 
     try {
-      setSpokenText("");
-      spokenTextRef.current = "";
-      isRecordingRef.current = true;
+      setSpokenText(""); spokenTextRef.current = ""; isRecordingRef.current = true;
+      const r = recognitionRef.current;
+      r.onstart = null; r.onresult = null; r.onend = null; r.onerror = null;
 
-      const recognition = recognitionRef.current;
+      const t = setTimeout(() => { if (isRecordingRef.current) { isRecordingRef.current = false; setNetworkErrorOccurred(true); r.abort(); } }, 10000);
 
-      // Clear any existing handlers to prevent conflicts
-      recognition.onstart = null;
-      recognition.onresult = null;
-      recognition.onend = null;
-      recognition.onerror = null;
-
-      // Add a timeout for starting recognition
-      const startTimeout = setTimeout(() => {
-        if (isRecordingRef.current && !recording) {
-          console.error("Speech recognition start timeout");
-          isRecordingRef.current = false;
-          setNetworkErrorOccurred(true);
-          recognition.abort();
-          alert("Speech recognition failed to start. This may be due to network issues or browser restrictions.");
-        }
-      }, 10000); // 10 second timeout
-
-      // Set up event handlers
-      recognition.onstart = () => {
-        clearTimeout(startTimeout);
-
-        setRecording(true);
-        setNetworkErrorOccurred(false);
+      r.onstart = () => { clearTimeout(t); setRecording(true); setNetworkErrorOccurred(false); };
+      r.onresult = ev => {
+        let full = ""; let isFinal = false;
+        for (let i = 0; i < ev.results.length; i++) { full += ev.results[i][0].transcript; if (ev.results[i].isFinal) isFinal = true; }
+        spokenTextRef.current = full; setSpokenText(full);
+        if (isFinal && full.trim()) r.stop();
       };
-
-      recognition.onresult = (event) => {
-        let fullTranscript = "";
-        let isFinal = false;
-
-        for (let i = 0; i < event.results.length; i++) {
-          const result = event.results[i];
-          fullTranscript += result[0].transcript;
-          if (result.isFinal) {
-            isFinal = true;
-          }
-        }
-
-
-        spokenTextRef.current = fullTranscript;
-        setSpokenText(fullTranscript);
-
-        // If we have a final result, process it immediately
-        if (isFinal && fullTranscript.trim()) {
-
-          recognition.stop(); // Stop listening after getting final result
-        }
+      r.onend = () => {
+        clearTimeout(t); isRecordingRef.current = false; setRecording(false);
+        if (spokenTextRef.current.trim()) processVoiceCommand(spokenTextRef.current);
       };
-
-      recognition.onend = () => {
-        clearTimeout(startTimeout);
-        isRecordingRef.current = false;
-        setRecording(false);
-
-        if (spokenTextRef.current.trim()) {
-          processVoiceCommand(spokenTextRef.current);
-        } else {
-        }
+      r.onerror = ev => {
+        clearTimeout(t); isRecordingRef.current = false; setRecording(false);
+        if (['network','service-not-allowed','not-allowed','audio-capture'].includes(ev.error)) setNetworkErrorOccurred(true);
       };
-
-      recognition.onerror = (event) => {
-        clearTimeout(startTimeout);
-        console.error("Speech recognition error:", event.error);
-        console.error("Error details:", event);
-
-        isRecordingRef.current = false;
-        setRecording(false);
-
-        switch (event.error) {
-          case 'network':
-            console.error("Network error - Google's speech service unavailable");
-            setNetworkErrorOccurred(true);
-            // Don't show alert immediately, let user try retry button
-            break;
-          case 'service-not-allowed':
-            console.error("Speech service not allowed");
-            setNetworkErrorOccurred(true);
-            alert("Speech recognition service is blocked. This may be due to network restrictions or privacy settings.");
-            break;
-          case 'not-allowed':
-            console.error("Permission denied");
-            alert("Microphone permission was denied. Please allow microphone access in your browser settings and refresh the page.");
-            break;
-          case 'no-speech':
-            // Don't set network error for no speech
-            break;
-          case 'audio-capture':
-            console.error("Audio capture error");
-            alert("Microphone error: Cannot capture audio. Please check your microphone connection and permissions.");
-            break;
-          case 'aborted':
-            break;
-          default:
-            console.error(`Unknown error: ${event.error}`);
-            setNetworkErrorOccurred(true);
-            break;
-        }
-      };
-      recognition.start();
-
-    } catch (error) {
-      console.error("Exception starting speech recognition:", error);
-      isRecordingRef.current = false;
-      setRecording(false);
-      setNetworkErrorOccurred(true);
-      alert(`Failed to start voice recognition: ${error.message}`);
+      r.start();
+    } catch (e) {
+      isRecordingRef.current = false; setRecording(false); setNetworkErrorOccurred(true);
     }
-  }, [requestMicrophonePermission, processVoiceCommand, testSpeechService, recording]);
+  }, [requestMicPermission, processVoiceCommand, testSpeechService, recording]);
 
   const stopListening = useCallback(() => {
-    if (!isRecordingRef.current || !recognitionRef.current) {
-      return;
-    }
-
-    try {
-      recognitionRef.current.stop();
-    } catch (error) {
-      console.error("Error stopping recognition:", error);
-      isRecordingRef.current = false;
-      setRecording(false);
-    }
+    if (!isRecordingRef.current || !recognitionRef.current) return;
+    try { recognitionRef.current.stop(); } catch { isRecordingRef.current = false; setRecording(false); }
   }, []);
 
   const handleTextInput = useCallback((e) => {
-    if (e.key === 'Enter') {
-      processVoiceCommand(e.target.value);
-      e.target.value = '';
-    }
+    if (e.key === 'Enter') { processVoiceCommand(e.target.value); e.target.value = ''; }
   }, [processVoiceCommand]);
-
-
 
   if (!gameState) return null;
 
+  const isMyTurn = currentPlayer === color;
+  const btnBase = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200";
+
   return (
-    <div className={`relative bg-white rounded-xl p-3 shadow-lg border ${className}`}>
-      {status === "win" && <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={400} recycle={false} />}
+    <div className={`relative ${className}`} style={{ overflow: 'hidden' }}>
+      {status === "win" && <Confetti width={windowSize.width} height={windowSize.height} numberOfPieces={400} recycle={false} colors={['#c9a84c','#f5e6c3','#8b6914','#e0bd6a']} />}
 
-      <Chessboard
-        position={gameState.fen()}
-        boardOrientation={isBlack ? "black" : "white"}
-        onPieceDrop={onDrop}
-        isDraggablePiece={({ piece }) => {
-          if (!gameStarted || status || mode === "voice" || !piece) {
-            return false;
-          }
-          const isMyTurn = currentPlayer === color;
-          const myPiecePrefix = color === 'black' ? 'b' : 'w';
-          return isMyTurn && piece.startsWith(myPiecePrefix);
-        }}
-      />
-
-      <div className="mt-4 flex flex-wrap justify-center items-center gap-4 relative z-20">
-        <button
-          className={`font-semibold px-4 py-2 rounded ${status
-            ? 'bg-gray-400 cursor-not-allowed'
-            : 'bg-yellow-500 hover:bg-yellow-600'
-            } text-white`}
-          onClick={handleDraw}
-          disabled={!!status}
-        >
-          Offer Draw
-        </button>
-
-        <button
-          className={`font-semibold px-4 py-2 rounded ${status
-            ? 'bg-gray-400 cursor-not-allowed'
-            : 'bg-red-500 hover:bg-red-600'
-            } text-white`}
-          onClick={handleResign}
-          disabled={!!status}
-        >
-          Resign
-        </button>
-
-        {mode === "voice" && speechSupported && !networkErrorOccurred && !recording && (
-          <button
-            onClick={startListening}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded"
-          >
-            Start Voice
-          </button>
-        )}
-
-        {mode === "voice" && speechSupported && networkErrorOccurred && (
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={() => {
-                setNetworkErrorOccurred(false);
-                setRetryCount(0);
-                startListening();
-              }}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-2 rounded"
-            >
-              Retry Voice Recognition
-            </button>
-            <div className="text-xs text-red-600 text-center">
-              Speech recognition failed. Try the retry button or use text input below.
-            </div>
+      {/* Board wrapper */}
+      <div className="board-container">
+        {/* Turn indicator */}
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-400 animate-pulse' : 'bg-[rgba(220,210,185,0.3)]'}`} />
+            <span className="text-xs font-medium" style={{ color: isMyTurn ? '#4ade80' : 'rgba(220,210,185,0.45)' }}>
+              {!gameStarted ? 'Waiting for opponent...' : isMyTurn ? 'Your Turn' : "Opponent's Turn"}
+            </span>
           </div>
-        )}
-
-        {mode === "voice" && speechSupported && !networkErrorOccurred && recording && (
-          <button
-            onClick={stopListening}
-            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded animate-pulse"
-          >
-            Stop Recording
-          </button>
-        )}
-
-        {mode === "voice" && (!speechSupported || networkErrorOccurred) && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="text-red-600 text-sm text-center">
-              {!speechSupported
-                ? `Voice recognition not supported (${browserInfo}). Use text input below:`
-                : "Network error - using text input:"}
+          {gameStarted && (
+            <div className="text-xs font-mono px-2 py-0.5 rounded-lg" style={{ background: 'rgba(201,168,76,0.1)', color: 'rgba(201,168,76,0.6)', border: '1px solid rgba(201,168,76,0.15)' }}>
+              {currentPlayer === 'white' ? '♔' : '♚'} {currentPlayer}
             </div>
-            <input
-              type="text"
-              placeholder="Type your move (e.g., 'e2 e4')"
-              className="px-3 py-2 border rounded text-sm w-48"
-              onKeyPress={handleTextInput}
-            />
-            <div className="text-xs text-gray-500 text-center">
-              Press Enter to make move
+          )}
+        </div>
+
+        {/* Board measurement + render */}
+        <div ref={containerRef} style={{ width: '100%' }}>
+          <Chessboard
+            position={gameState.fen()}
+            boardOrientation={isBlack ? "black" : "white"}
+            onPieceDrop={onDrop}
+            boardWidth={boardWidth || undefined}
+            isDraggablePiece={({ piece }) => {
+              if (!gameStarted || status || mode === "voice" || !piece) return false;
+              return currentPlayer === color && piece.startsWith(color === 'black' ? 'b' : 'w');
+            }}
+            customBoardStyle={{
+              borderRadius: '6px',
+              boxShadow: '0 0 40px rgba(0,0,0,0.6)',
+            }}
+            customDarkSquareStyle={{ backgroundColor: '#4a2d0e' }}
+            customLightSquareStyle={{ backgroundColor: '#e8d5a0' }}
+          />
+        </div>
+
+        {/* Action buttons */}
+        <div className="mt-3 flex flex-wrap justify-center items-center gap-2">
+          <button
+            className={btnBase}
+            style={{
+              background: status ? 'rgba(255,255,255,0.04)' : 'rgba(201,168,76,0.12)',
+              border: `1px solid ${status ? 'rgba(255,255,255,0.08)' : 'rgba(201,168,76,0.25)'}`,
+              color: status ? 'rgba(220,210,185,0.3)' : '#c9a84c',
+              cursor: status ? 'not-allowed' : 'pointer',
+            }}
+            onClick={handleDraw} disabled={!!status}>
+            <Handshake style={{ width: '15px', height: '15px' }} /> Offer Draw
+          </button>
+
+          <button
+            className={btnBase}
+            style={{
+              background: status ? 'rgba(255,255,255,0.04)' : 'rgba(248,113,113,0.1)',
+              border: `1px solid ${status ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.25)'}`,
+              color: status ? 'rgba(220,210,185,0.3)' : '#f87171',
+              cursor: status ? 'not-allowed' : 'pointer',
+            }}
+            onClick={handleResign} disabled={!!status}>
+            <Flag style={{ width: '15px', height: '15px' }} /> Resign
+          </button>
+
+          {/* Voice controls */}
+          {mode === "voice" && speechSupported && !networkErrorOccurred && !recording && (
+            <button onClick={startListening} className={btnBase}
+              style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', color: '#4ade80' }}>
+              <Mic style={{ width: '15px', height: '15px' }} /> Voice
+            </button>
+          )}
+          {mode === "voice" && speechSupported && !networkErrorOccurred && recording && (
+            <button onClick={stopListening} className={`${btnBase} animate-pulse`}
+              style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', color: '#f87171' }}>
+              <MicOff style={{ width: '15px', height: '15px' }} /> Stop
+            </button>
+          )}
+          {mode === "voice" && speechSupported && networkErrorOccurred && (
+            <button onClick={() => { setNetworkErrorOccurred(false); startListening(); }} className={btnBase}
+              style={{ background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.25)', color: '#fb923c' }}>
+              <RotateCcw style={{ width: '15px', height: '15px' }} /> Retry
+            </button>
+          )}
+          {mode === "voice" && (!speechSupported || networkErrorOccurred) && (
+            <div className="flex flex-col items-center gap-1.5 w-full">
+              <p className="text-xs" style={{ color: 'rgba(248,113,113,0.8)' }}>
+                {!speechSupported ? `Voice not supported (${browserInfo})` : 'Network error — use text:'}
+              </p>
+              <input type="text" placeholder="Type move (e.g. e2 e4) + Enter"
+                className="text-xs px-3 py-2 rounded-xl outline-none w-52"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,168,76,0.2)', color: '#e8e0d0' }}
+                onKeyPress={handleTextInput} />
+            </div>
+          )}
+        </div>
+
+        {/* Voice listening indicator */}
+        {mode === "voice" && recording && (
+          <div className="mt-2 px-3 py-2 rounded-xl flex items-center gap-3"
+            style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)' }}>
+            <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <div className="flex-1">
+              <span className="text-xs font-semibold text-blue-300">Listening...</span>
+              {spokenText && <p className="text-xs mt-0.5 text-[rgba(220,210,185,0.6)]">Heard: "{spokenText}"</p>}
             </div>
           </div>
         )}
       </div>
 
-      {mode === "voice" && recording && (
-        <div className="mt-2 p-2 bg-blue-100 border border-blue-300 rounded text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-            <strong>Listening...</strong>
-          </div>
-          {spokenText && (
-            <div className="mt-1 text-gray-700">
-              Heard: "{spokenText}"
-            </div>
-          )}
-          <div className="mt-1 text-xs text-gray-500">
-            Say your move like "e2 to e4" or "knight f3"
-          </div>
-        </div>
-      )}
-
-      {mode === "voice" && !speechSupported && (
-        <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded text-sm text-yellow-800">
-          <strong>Browser: {browserInfo}</strong>
-          <div className="mt-1">
-            <strong>Voice recognition requirements:</strong>
-            <ul className="mt-1 text-xs list-disc list-inside">
-              <li>Use Chrome browser (recommended)</li>
-              <li>Ensure you're on HTTPS or localhost</li>
-              <li>Allow microphone permissions</li>
-              <li>Avoid Brave browser (blocks for privacy)</li>
-            </ul>
-          </div>
-        </div>
-      )}
-
+      {/* Game Over Overlay */}
       <AnimatePresence>
         {status && (
           <motion.div
-            className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white p-6 rounded-xl"
-            initial={{ opacity: 0, scale: 0.9 }}
+            className="absolute inset-0 flex flex-col items-center justify-center text-white p-6 rounded-xl"
+            style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', zIndex: 20 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-          >
-            <h2 className="text-3xl font-bold mb-4">
-              {status === "draw" && "Game Draw!"}
-              {status === "win" && "You Won!"}
-              {status === "lose" && "You Lost!"}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}>
+
+            {/* Status icon */}
+            <div className="mb-4 text-6xl" style={{ filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.6))' }}>
+              {status === 'win' ? '♔' : status === 'draw' ? '🤝' : '♚'}
+            </div>
+
+            <h2 className="text-4xl font-black mb-2" style={{
+              fontFamily: 'Cinzel, serif',
+              background: status === 'win' ? 'linear-gradient(135deg, #f5e6c3, #c9a84c)' : status === 'draw' ? 'linear-gradient(135deg, #93c5fd, #60a5fa)' : 'linear-gradient(135deg, #fca5a5, #f87171)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              {status === 'win' ? 'Victory!' : status === 'draw' ? 'Draw!' : 'Defeat'}
             </h2>
-            {(status === "draw" || status === "lose") && (
-              <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 1 }}
-              >
-                {status === "draw" ? "Draw" : "Better luck next time"}
-              </motion.div>
-            )}
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="mt-6 bg-white text-black px-6 py-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              Go to Dashboard
+
+            <p className="text-sm mb-6" style={{ color: 'rgba(220,210,185,0.55)' }}>
+              {status === 'win' ? 'Magnificent play! You dominated the board.' : status === 'draw' ? 'A hard-fought battle ends in a draw.' : 'Better luck next time. Study and improve!'}
+            </p>
+
+            <button onClick={() => navigate("/dashboard")}
+              className="btn-gold flex items-center gap-2">
+              <LayoutDashboard style={{ width: '16px', height: '16px' }} />
+              Back to Dashboard
             </button>
           </motion.div>
         )}

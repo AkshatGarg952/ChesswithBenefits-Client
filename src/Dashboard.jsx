@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, Plus, LogOut, Home, BarChart3, Circle, TrendingUp, Target, Trophy, Zap } from 'lucide-react';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Users, Plus, LogOut, Home, BarChart3, Circle, TrendingUp, Target, Trophy, Zap, Crown, RefreshCw, Swords, ChevronRight, Shuffle } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from "react-router-dom";
 import { socket } from "./socket/SocketConnection.js";
-import { getSession, setSession, clearGameSession } from './utils/session.js';
-const ChessDashboard = () => {
-  clearGameSession()
+import { clearGameSession } from './utils/session.js';
 
+const ChessDashboard = () => {
+  clearGameSession();
 
   const navigate = useNavigate();
-
   const token = sessionStorage.getItem('token');
   const userId = sessionStorage.getItem('user');
   const [currentView, setCurrentView] = useState('dashboard');
@@ -34,209 +33,109 @@ const ChessDashboard = () => {
     navigate('/');
   };
 
-
-
-
   useEffect(() => {
     const fetchGameHistory = async () => {
-      if (!userId) {
-        setError('Please log in to view game statistics');
-        setLoading(false);
-        return;
-      }
-
+      if (!userId) { setError('Please log in to view game statistics'); setLoading(false); return; }
       try {
         setLoading(true);
         const API_URL = import.meta.env.VITE_SERVER_URL;
-
-
-        const response = await axios.get(`${API_URL}/api/games/history/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-
+        const response = await axios.get(`${API_URL}/api/games/history/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
         const { totalGames, won, lost, draw, noResult } = response.data;
-
-        const moveResponse = await axios.get(`${API_URL}/api/games/moveshistory/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-
+        const moveResponse = await axios.get(`${API_URL}/api/games/moveshistory/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
         const { totalMoves, brilliant, best, good, inaccurate, mistake, blunder } = moveResponse.data;
 
-        const stats = [
-          { name: 'Won', value: won, color: '#10B981' },
-          { name: 'Lost', value: lost, color: '#EF4444' },
-          { name: 'Draw', value: draw, color: '#F59E0B' },
-          { name: 'No Result', value: noResult, color: '#9CA3AF' },
-        ];
-
-        const moveData = [
-          { name: 'Brilliant', value: brilliant.count, color: '#06B6D4', percentage: brilliant.percentage },
-          { name: 'Best', value: best.count, color: '#10B981', percentage: best.percentage },
-          { name: 'Good', value: good.count, color: '#84CC16', percentage: good.percentage },
-          { name: 'Inaccurate', value: inaccurate.count, color: '#F59E0B', percentage: inaccurate.percentage },
-          { name: 'Mistake', value: mistake.count, color: '#F97316', percentage: mistake.percentage },
-          { name: 'Blunder', value: blunder.count, color: '#EF4444', percentage: blunder.percentage },
-        ];
-
-        setGameStats(stats);
+        setGameStats([
+          { name: 'Won',       value: won,            color: '#4ade80' },
+          { name: 'Lost',      value: lost,           color: '#f87171' },
+          { name: 'Draw',      value: draw,           color: '#c9a84c' },
+          { name: 'No Result', value: noResult,       color: '#6b7280' },
+        ]);
+        setMoveStats([
+          { name: 'Brilliant',  value: brilliant.count,  color: '#06b6d4', percentage: brilliant.percentage },
+          { name: 'Best',       value: best.count,       color: '#4ade80', percentage: best.percentage },
+          { name: 'Good',       value: good.count,       color: '#a3e635', percentage: good.percentage },
+          { name: 'Inaccurate', value: inaccurate.count, color: '#c9a84c', percentage: inaccurate.percentage },
+          { name: 'Mistake',    value: mistake.count,    color: '#fb923c', percentage: mistake.percentage },
+          { name: 'Blunder',    value: blunder.count,    color: '#f87171', percentage: blunder.percentage },
+        ]);
         setTotalGames(totalGames);
-        setMoveStats(moveData);
         setTotalMoves(totalMoves);
         setLoading(false);
       } catch (err) {
-        const message = err.response?.status === 401
-          ? 'Invalid or unauthorized user. Please log in again.'
-          : 'Failed to fetch data. Please try again later.';
-        setError(message);
+        setError(err.response?.status === 401 ? 'Invalid or unauthorized user.' : 'Failed to fetch data.');
         setLoading(false);
-        console.error(err);
       }
     };
-
     fetchGameHistory();
   }, [userId, token]);
 
-  function generateRoomId() {
-    return Math.random().toString(36).substr(2, 8).toUpperCase();
-  }
-
-  // const handleJoinRoom = () => {
-  //   if (roomId.trim()) {
-  //     const rId = roomId;
-  //     const c = commentaryMode;
-  //     const g = mode;
-  //     alert(`Joining room: ${rId} with commentary ${commentaryMode ? 'enabled' : 'disabled'}`);
-  //     setCurrentView('dashboard');
-  //     setRoomId('');
-  //     setCommentaryMode("off");
-  //     setMode("manual");
-  //     socket.emit("joinRoom", { userId, roomId: rId, color: undefined });
-
-  //     socket.once("assignedColor", (color) => {
-  //       navigate("/game", {
-  //         state: {
-  //           color: color,
-  //           roomId: rId,
-  //           userId: userId,
-  //           commentary: c,
-  //           mode: g
-  //         }
-  //       });
-  //     });
-  //   } else {
-  //     alert('Please enter a valid Room ID');
-  //   }
-  // };
+  function generateRoomId() { return Math.random().toString(36).substr(2, 8).toUpperCase(); }
 
   const handleJoinRoom = () => {
-    // 1. Validate that a Room ID was entered
     if (roomId.trim()) {
-
-      // 2. Prepare the data to be passed to the game page
-      const gameData = {
-        roomId: roomId,
-        userId: userId,
-        commentary: commentaryMode,
-        mode: mode,
-        color: undefined,
-      };
-
-      navigate("/game", { state: gameData });
-
+      navigate("/game", { state: { roomId, userId, commentary: commentaryMode, mode, color: undefined } });
     } else {
       alert('Please enter a valid Room ID');
     }
   };
+
   const handleCreateRoom = () => {
-    // const rId = generatedRoomId;
-    // const color = selectedPiece;
-    // const c = commentaryMode;
-    // const g = mode;
-    const roomData = {
-      roomId: generatedRoomId,
-      color: selectedPiece,
-      userId: userId,
-      commentary: commentaryMode,
-      mode: mode,
-    };
+    const roomData = { roomId: generatedRoomId, color: selectedPiece, userId, commentary: commentaryMode, mode };
     setCurrentView('dashboard');
     setSelectedPiece('white');
     setCommentaryMode("off");
     setGeneratedRoomId(generateRoomId());
     setMode("manual");
-
-    // socket.emit("joinRoom", { userId, roomId: rId, color });
-
-    // socket.once("assignedColor", (color) => {
-    //   navigate("/game", {
-    //     state: {
-    //       color: color,
-    //       roomId: rId,
-    //       userId: userId,
-    //       commentary: c,
-    //       mode: g
-    //     }
-    //   });
-    // });
-
     navigate("/game", { state: roomData });
   };
 
+  // ─── NAVBAR ───
   const renderNavbar = () => (
-    <nav className="glass border-b border-white/20 shadow-glass">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6">
-        <div className="flex justify-between items-center h-14 sm:h-16 md:h-18">
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 bg-gradient-to-br from-primary-600 to-accent-600 rounded-xl flex items-center justify-center shadow-glow-sm">
-              <span className="text-white font-bold text-base sm:text-lg md:text-xl">♔</span>
+    <nav style={{
+      background: 'rgba(10,10,15,0.95)',
+      backdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(201,168,76,0.15)',
+      boxShadow: '0 4px 30px rgba(0,0,0,0.5)',
+    }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #c9a84c, #8b6914)', boxShadow: '0 0 15px rgba(201,168,76,0.35)' }}>
+              <Crown className="h-5 w-5 text-[#0a0a0f]" strokeWidth={2.5} />
             </div>
-            <span className="text-lg sm:text-xl md:text-2xl font-display font-bold gradient-text">Chess with Benefits</span>
+            <span className="text-lg font-bold" style={{ fontFamily: 'Cinzel, serif', background: 'linear-gradient(135deg, #f5e6c3, #c9a84c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Chess with Benefits
+            </span>
           </div>
 
-          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 rounded-xl transition-all duration-300 min-h-[44px] ${currentView === 'dashboard'
-                ? 'bg-primary-100 text-primary-700 shadow-inner'
-                : 'text-gray-700 hover:bg-white/50'
-                }`}
-            >
-              <Home size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium text-sm md:text-base">Dashboard</span>
-            </button>
+          {/* Nav items */}
+          <div className="flex items-center gap-1">
+            {[
+              { id: 'dashboard', label: 'Dashboard', Icon: Home },
+              { id: 'create',    label: 'Create',    Icon: Plus },
+              { id: 'join',      label: 'Join',      Icon: Users },
+            ].map(({ id, label, Icon }) => (
+              <button key={id} onClick={() => setCurrentView(id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 min-h-[44px]"
+                style={{
+                  background: currentView === id ? 'rgba(201,168,76,0.15)' : 'transparent',
+                  color: currentView === id ? '#c9a84c' : 'rgba(220,210,185,0.6)',
+                  border: currentView === id ? '1px solid rgba(201,168,76,0.25)' : '1px solid transparent',
+                }}>
+                <Icon size={16} />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
 
-            <button
-              onClick={() => setCurrentView('create')}
-              className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 rounded-xl transition-all duration-300 min-h-[44px] ${currentView === 'create'
-                ? 'bg-primary-100 text-primary-700 shadow-inner'
-                : 'text-gray-700 hover:bg-white/50'
-                }`}
-            >
-              <Plus size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium text-sm md:text-base">Create</span>
-            </button>
-
-            <button
-              onClick={() => setCurrentView('join')}
-              className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 rounded-xl transition-all duration-300 min-h-[44px] ${currentView === 'join'
-                ? 'bg-primary-100 text-primary-700 shadow-inner'
-                : 'text-gray-700 hover:bg-white/50'
-                }`}
-            >
-              <Users size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium text-sm md:text-base">Join</span>
-            </button>
-
-            <button
-              onClick={handlePlayClick}
-              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 md:px-4 py-2 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 min-h-[44px]"
-            >
-              <LogOut size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline font-medium text-sm md:text-base">Logout</span>
+            <button onClick={handlePlayClick}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 min-h-[44px] ml-2"
+              style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -244,149 +143,112 @@ const ChessDashboard = () => {
     </nav>
   );
 
+  // ─── DASHBOARD ───
   const renderDashboard = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-50 to-red-50">
-          <div className="text-center text-gray-600 text-lg">Loading statistics...</div>
+    if (loading) return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-5xl mb-4 animate-float">♔</div>
+          <p className="text-[rgba(220,210,185,0.5)] text-sm tracking-wider uppercase">Loading statistics...</p>
         </div>
-      );
-    }
+      </div>
+    );
 
-    if (error) {
-      return (
-        <div className="flex items-center justify-center h-full bg-gradient-to-br from-orange-50 to-red-50">
-          <div className="text-center text-red-600 text-lg">{error}</div>
+    if (error) return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center px-4 py-8 rounded-2xl" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
+          <p className="text-red-400 font-medium">{error}</p>
         </div>
-      );
-    }
+      </div>
+    );
 
-    const winRate = totalGames > 0 ? ((gameStats.find(stat => stat.name === 'Won')?.value || 0) / totalGames * 100).toFixed(1) : 0;
-    const bestMoves = moveStats.slice(0, 3).reduce((sum, stat) => sum + stat.value, 0);
+    const winRate = totalGames > 0 ? ((gameStats.find(s => s.name === 'Won')?.value || 0) / totalGames * 100).toFixed(1) : 0;
+    const bestMoves = moveStats.slice(0, 3).reduce((sum, s) => sum + s.value, 0);
+
+    const statCards = [
+      { label: 'Total Games', value: totalGames, Icon: Trophy,    color: '#c9a84c', bg: 'rgba(201,168,76,0.1)' },
+      { label: 'Win Rate',    value: `${winRate}%`, Icon: TrendingUp, color: '#4ade80', bg: 'rgba(74,222,128,0.1)' },
+      { label: 'Total Moves', value: totalMoves, Icon: Target,    color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
+      { label: 'Best Moves',  value: bestMoves,  Icon: Zap,       color: '#fb923c', bg: 'rgba(251,146,60,0.1)' },
+    ];
+
+    const tooltipStyle = {
+      contentStyle: { background: 'rgba(15,13,24,0.97)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '0.75rem', color: '#e8e0d0' },
+      labelStyle: { color: '#c9a84c', fontWeight: 600 },
+    };
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
-            <div className="card-glass border-l-4 border-primary-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Games</p>
-                  <p className="text-2xl sm:text-3xl font-display font-bold gradient-text-purple">{totalGames}</p>
-                </div>
-                <div className="p-2 sm:p-3 bg-gradient-to-br from-primary-100 to-primary-200 rounded-xl">
-                  <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" />
-                </div>
-              </div>
-            </div>
+      <div className="min-h-screen p-4 sm:p-6" style={{ background: '#0a0a0f' }}>
+        <div className="max-w-7xl mx-auto space-y-6">
 
-            <div className="card-glass border-l-4 border-success-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-100 p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Win Rate</p>
-                  <p className="text-2xl sm:text-3xl font-display font-bold bg-gradient-to-r from-success-600 to-success-400 bg-clip-text text-transparent">{winRate}%</p>
-                </div>
-                <div className="p-2 sm:p-3 bg-gradient-to-br from-success-100 to-success-200 rounded-xl">
-                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-success-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="card-glass border-l-4 border-info-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-200 p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Moves</p>
-                  <p className="text-2xl sm:text-3xl font-display font-bold bg-gradient-to-r from-info-600 to-info-400 bg-clip-text text-transparent">{totalMoves}</p>
-                </div>
-                <div className="p-2 sm:p-3 bg-gradient-to-br from-info-100 to-info-200 rounded-xl">
-                  <Target className="h-5 w-5 sm:h-6 sm:w-6 text-info-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="card-glass border-l-4 border-accent-500 hover:shadow-glow-md transition-all duration-300 animate-fade-in-up animation-delay-300 p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Best Moves</p>
-                  <p className="text-2xl sm:text-3xl font-display font-bold gradient-text-orange">{bestMoves}</p>
-                </div>
-                <div className="p-2 sm:p-3 bg-gradient-to-br from-accent-100 to-accent-200 rounded-xl">
-                  <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-accent-600" />
-                </div>
-              </div>
-            </div>
+          {/* Welcome */}
+          <div className="animate-fade-in-up">
+            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Cinzel, serif' }}>Your Dashboard</h2>
+            <p className="text-[rgba(220,210,185,0.5)] text-sm mt-1">Track your performance and start new games</p>
           </div>
 
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Game Statistics */}
-            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800">Game Results</h3>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => setGameChartType('pie')}
-                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${gameChartType === 'pie'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
-                      }`}
-                  >
-                    <Circle size={18} className="sm:w-5 sm:h-5" />
-                  </button>
-                  <button
-                    onClick={() => setGameChartType('bar')}
-                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${gameChartType === 'bar'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
-                      }`}
-                  >
-                    <BarChart3 size={18} className="sm:w-5 sm:h-5" />
-                  </button>
+          {/* Stat Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+            {statCards.map(({ label, value, Icon, color, bg }, i) => (
+              <div key={label} className="stat-card" style={{ animationDelay: `${i * 80}ms` }}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-medium tracking-wider uppercase mb-2" style={{ color: 'rgba(220,210,185,0.5)' }}>{label}</p>
+                    <p className="text-3xl font-bold" style={{ fontFamily: 'Outfit, sans-serif', color }}>{value}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: bg }}>
+                    <Icon style={{ width: '18px', height: '18px', color }} />
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="h-64 sm:h-80">
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Game Results */}
+            <div className="card-dark p-5" style={{ animationDelay: '200ms' }}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-semibold text-white">Game Results</h3>
+                <div className="flex gap-1.5">
+                  {[{ type: 'pie', Icon: Circle }, { type: 'bar', Icon: BarChart3 }].map(({ type, Icon }) => (
+                    <button key={type} onClick={() => setGameChartType(type)}
+                      className="p-2 rounded-lg transition-all"
+                      style={{
+                        background: gameChartType === type ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: gameChartType === type ? '#c9a84c' : 'rgba(220,210,185,0.5)',
+                        border: `1px solid ${gameChartType === type ? 'rgba(201,168,76,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                      }}>
+                      <Icon size={15} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ height: '280px' }}>
                 {totalGames === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-600 text-sm sm:text-base md:text-lg">
-                    Sorry, you have not played any games yet.
+                  <div className="flex flex-col items-center justify-center h-full gap-3">
+                    <Trophy className="w-10 h-10" style={{ color: 'rgba(201,168,76,0.2)' }} />
+                    <p className="text-sm" style={{ color: 'rgba(220,210,185,0.4)' }}>No games played yet</p>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     {gameChartType === 'pie' ? (
                       <PieChart>
-                        <Pie
-                          data={gameStats.filter(stat => stat.value > 0)}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-                          labelLine={true}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {gameStats.filter(stat => stat.value > 0).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
+                        <Pie data={gameStats.filter(s => s.value > 0)} cx="50%" cy="50%" outerRadius={100}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          labelLine fill="#8884d8" dataKey="value">
+                          {gameStats.filter(s => s.value > 0).map((entry, i) => <Cell key={i} fill={entry.color} />)}
                         </Pie>
-                        <Tooltip />
+                        <Tooltip {...tooltipStyle} />
                       </PieChart>
                     ) : (
-                      <BarChart data={gameStats} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          fontSize={12}
-                        />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          {gameStats.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
+                      <BarChart data={gameStats} margin={{ top: 10, right: 20, left: -10, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(201,168,76,0.08)" />
+                        <XAxis dataKey="name" angle={-30} textAnchor="end" height={50} fontSize={11} tick={{ fill: 'rgba(220,210,185,0.6)' }} />
+                        <YAxis fontSize={11} tick={{ fill: 'rgba(220,210,185,0.6)' }} />
+                        <Tooltip {...tooltipStyle} />
+                        <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                          {gameStats.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                         </Bar>
                       </BarChart>
                     )}
@@ -396,72 +258,47 @@ const ChessDashboard = () => {
             </div>
 
             {/* Move Quality */}
-            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800">Move Quality</h3>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => setMoveChartType('pie')}
-                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${moveChartType === 'pie'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
-                      }`}
-                  >
-                    <Circle size={18} className="sm:w-5 sm:h-5" />
-                  </button>
-                  <button
-                    onClick={() => setMoveChartType('bar')}
-                    className={`p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${moveChartType === 'bar'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
-                      }`}
-                  >
-                    <BarChart3 size={18} className="sm:w-5 sm:h-5" />
-                  </button>
+            <div className="card-dark p-5">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-semibold text-white">Move Quality</h3>
+                <div className="flex gap-1.5">
+                  {[{ type: 'pie', Icon: Circle }, { type: 'bar', Icon: BarChart3 }].map(({ type, Icon }) => (
+                    <button key={type} onClick={() => setMoveChartType(type)}
+                      className="p-2 rounded-lg transition-all"
+                      style={{
+                        background: moveChartType === type ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: moveChartType === type ? '#c9a84c' : 'rgba(220,210,185,0.5)',
+                        border: `1px solid ${moveChartType === type ? 'rgba(201,168,76,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                      }}>
+                      <Icon size={15} />
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              <div className="h-64 sm:h-80">
+              <div style={{ height: '280px' }}>
                 {totalMoves === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-600 text-sm sm:text-base md:text-lg">
-                    Sorry, you have not made any moves yet.
+                  <div className="flex flex-col items-center justify-center h-full gap-3">
+                    <Zap className="w-10 h-10" style={{ color: 'rgba(201,168,76,0.2)' }} />
+                    <p className="text-sm" style={{ color: 'rgba(220,210,185,0.4)' }}>No moves recorded yet</p>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     {moveChartType === 'pie' ? (
                       <PieChart>
-                        <Pie
-                          data={moveStats.filter(stat => stat.value > 0)}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          label={({ name, percentage }) => `${name} ${percentage}%`}
-                          labelLine={true}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {moveStats.filter(stat => stat.value > 0).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
+                        <Pie data={moveStats.filter(s => s.value > 0)} cx="50%" cy="50%" outerRadius={100}
+                          label={({ name, percentage }) => `${name} ${percentage}%`} labelLine dataKey="value">
+                          {moveStats.filter(s => s.value > 0).map((entry, i) => <Cell key={i} fill={entry.color} />)}
                         </Pie>
-                        <Tooltip formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, name]} />
+                        <Tooltip {...tooltipStyle} formatter={(v, n, p) => [`${v} (${p.payload.percentage}%)`, n]} />
                       </PieChart>
                     ) : (
-                      <BarChart data={moveStats} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          fontSize={12}
-                        />
-                        <YAxis />
-                        <Tooltip formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, name]} />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          {moveStats.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
+                      <BarChart data={moveStats} margin={{ top: 10, right: 20, left: -10, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(201,168,76,0.08)" />
+                        <XAxis dataKey="name" angle={-30} textAnchor="end" height={50} fontSize={11} tick={{ fill: 'rgba(220,210,185,0.6)' }} />
+                        <YAxis fontSize={11} tick={{ fill: 'rgba(220,210,185,0.6)' }} />
+                        <Tooltip {...tooltipStyle} formatter={(v, n, p) => [`${v} (${p.payload.percentage}%)`, n]} />
+                        <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                          {moveStats.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                         </Bar>
                       </BarChart>
                     )}
@@ -471,217 +308,176 @@ const ChessDashboard = () => {
             </div>
           </div>
 
-          {/* Detailed Stats Tables */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Game Details */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Game Breakdown</h3>
-              <div className="space-y-3">
-                {gameStats.map((stat, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: stat.color }}
-                      ></div>
-                      <span className="font-medium text-gray-700">{stat.name}</span>
+          {/* Breakdown tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[
+              { title: 'Game Breakdown', data: gameStats, total: totalGames, showPct: true },
+              { title: 'Move Analysis',  data: moveStats, total: totalMoves, showPct: false },
+            ].map(({ title, data, total, showPct }) => (
+              <div key={title} className="card-dark p-5">
+                <h3 className="text-base font-semibold text-white mb-4">{title}</h3>
+                <div className="space-y-2">
+                  {data.map((stat, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-xl transition-all"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(201,168,76,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stat.color, boxShadow: `0 0 6px ${stat.color}60` }} />
+                        <span className="text-sm font-medium" style={{ color: 'rgba(220,210,185,0.8)' }}>{stat.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-base font-bold text-white">{stat.value}</span>
+                        <span className="text-xs ml-2" style={{ color: 'rgba(220,210,185,0.45)' }}>
+                          ({showPct
+                            ? total > 0 ? ((stat.value / total) * 100).toFixed(1) : 0
+                            : stat.percentage || 0}%)
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-lg font-bold text-gray-900">{stat.value}</span>
-                      <span className="text-sm text-gray-500 ml-2">
-                        ({totalGames > 0 ? ((stat.value / totalGames) * 100).toFixed(1) : 0}%)
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-
-            {/* Move Details */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Move Analysis</h3>
-              <div className="space-y-3">
-                {moveStats.map((stat, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: stat.color }}
-                      ></div>
-                      <span className="font-medium text-gray-700">{stat.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-lg font-bold text-gray-900">{stat.value}</span>
-                      <span className="text-sm text-gray-500 ml-2">
-                        ({stat.percentage}%)
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
+
         </div>
       </div>
     );
   };
 
+  // ─── SHARED FORM SECTIONS ───
+  const LabeledField = ({ label, children }) => (
+    <div>
+      <label className="block text-sm font-medium mb-1.5" style={{ color: 'rgba(220,210,185,0.65)' }}>{label}</label>
+      {children}
+    </div>
+  );
+
+  // ─── JOIN ROOM ───
   const renderJoinRoom = () => (
-    <div className="flex items-center justify-center min-h-[calc(100vh-5rem)] bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 p-4">
-      <div className="glass-card w-full max-w-md shadow-glass-lg animate-scale-in">
-        <h2 className="text-2xl sm:text-3xl font-display font-bold gradient-text mb-6 text-center">Join a Room</h2>
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Room ID</label>
-            <input
-              type="text"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="Enter room ID..."
-              className="input-modern"
-            />
+    <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4" style={{ background: '#0a0a0f' }}>
+      <div className="w-full max-w-md animate-scale-in">
+        <div className="card-dark p-8">
+          <div className="flex items-center gap-3 mb-7">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.2)' }}>
+              <Users className="h-5 w-5" style={{ color: '#60a5fa' }} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Cinzel, serif' }}>Join a Room</h2>
+              <p className="text-xs" style={{ color: 'rgba(220,210,185,0.5)' }}>Enter room code to join a game</p>
+            </div>
           </div>
 
-          <div>
-            <label htmlFor="commentary-mode" className="block text-sm font-semibold text-gray-700 mb-2">
-              Commentary Mode
-            </label>
-            <select
-              id="commentary-mode"
-              value={commentaryMode}
-              onChange={(e) => setCommentaryMode(e.target.value)}
-              className="input-modern"
-            >
-              <option value="off">Off</option>
-              <option value="roast">Roast</option>
-              <option value="beginner">Beginner's</option>
-              <option value="hype">Hype</option>
-            </select>
-          </div>
+          <div className="space-y-4">
+            <LabeledField label="Room ID">
+              <input type="text" value={roomId} onChange={e => setRoomId(e.target.value)}
+                placeholder="Enter room code (e.g. ABCD1234)" className="input-dark" />
+            </LabeledField>
 
-          <div>
-            <label htmlFor="game-mode" className="block text-sm font-semibold text-gray-700 mb-2">
-              Game Mode
-            </label>
-            <select
-              id="game-mode"
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className="input-modern"
-            >
-              <option value="manual">Manual</option>
-              <option value="voice">Voice</option>
-            </select>
-          </div>
+            <LabeledField label="Commentary Mode">
+              <select value={commentaryMode} onChange={e => setCommentaryMode(e.target.value)} className="select-dark">
+                <option value="off">Off</option>
+                <option value="roast">Roast</option>
+                <option value="beginner">Beginner's</option>
+                <option value="hype">Hype</option>
+              </select>
+            </LabeledField>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-300 font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleJoinRoom}
-              className="btn-primary flex-1"
-            >
-              Join Room
-            </button>
+            <LabeledField label="Game Mode">
+              <select value={mode} onChange={e => setMode(e.target.value)} className="select-dark">
+                <option value="manual">Manual</option>
+                <option value="voice">Voice</option>
+              </select>
+            </LabeledField>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setCurrentView('dashboard')} className="btn-dark flex-1">Cancel</button>
+              <button onClick={handleJoinRoom} className="btn-gold flex-1 flex items-center justify-center gap-2">
+                <Swords className="h-4 w-4" /> Join Room
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 
+  // ─── CREATE ROOM ───
   const renderCreateRoom = () => (
-    <div className="flex items-center justify-center min-h-[calc(100vh-5rem)] bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 p-4">
-      <div className="glass-card w-full max-w-md shadow-glass-lg animate-scale-in">
-        <h2 className="text-2xl sm:text-3xl font-display font-bold gradient-text mb-6 text-center">Create a Room</h2>
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Room ID</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={generatedRoomId}
-                readOnly
-                className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-700 font-mono"
-              />
-              <button
-                onClick={() => setGeneratedRoomId(generateRoomId())}
-                className="px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl hover:from-primary-700 hover:to-accent-700 transition-all duration-300 font-semibold shadow-glow-sm"
-              >
-                New
+    <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4" style={{ background: '#0a0a0f' }}>
+      <div className="w-full max-w-md animate-scale-in">
+        <div className="card-dark p-8">
+          <div className="flex items-center gap-3 mb-7">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.25)' }}>
+              <Plus className="h-5 w-5 text-[#c9a84c]" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Cinzel, serif' }}>Create a Room</h2>
+              <p className="text-xs" style={{ color: 'rgba(220,210,185,0.5)' }}>Set up your game and invite a friend</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <LabeledField label="Room Code">
+              <div className="flex gap-2">
+                <input type="text" value={generatedRoomId} readOnly
+                  className="flex-1 input-dark font-mono tracking-widest text-[#c9a84c]" />
+                <button onClick={() => setGeneratedRoomId(generateRoomId())}
+                  className="px-3 rounded-xl flex items-center gap-1.5 text-sm font-medium transition-all"
+                  style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.25)', color: '#c9a84c' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(201,168,76,0.2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(201,168,76,0.12)'}>
+                  <RefreshCw className="h-4 w-4" /> New
+                </button>
+              </div>
+            </LabeledField>
+
+            <LabeledField label="Choose Your Side">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { val: 'white',  label: 'White', icon: '♔' },
+                  { val: 'black',  label: 'Black', icon: '♚' },
+                  { val: 'random', label: 'Random', icon: '🎲' },
+                ].map(({ val, label, icon }) => (
+                  <button key={val} onClick={() => setSelectedPiece(val)}
+                    className="py-3 rounded-xl flex flex-col items-center gap-1 text-sm font-medium transition-all"
+                    style={{
+                      background: selectedPiece === val ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${selectedPiece === val ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                      color: selectedPiece === val ? '#c9a84c' : 'rgba(220,210,185,0.6)',
+                    }}>
+                    <span className="text-xl">{icon}</span>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </LabeledField>
+
+            <LabeledField label="Commentary Mode">
+              <select value={commentaryMode} onChange={e => setCommentaryMode(e.target.value)} className="select-dark">
+                <option value="off">Off</option>
+                <option value="roast">Roast</option>
+                <option value="beginner">Beginner's</option>
+                <option value="hype">Hype</option>
+              </select>
+            </LabeledField>
+
+            <LabeledField label="Game Mode">
+              <select value={mode} onChange={e => setMode(e.target.value)} className="select-dark">
+                <option value="manual">Manual</option>
+                <option value="voice">Voice</option>
+              </select>
+            </LabeledField>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setCurrentView('dashboard')} className="btn-dark flex-1">Cancel</button>
+              <button onClick={handleCreateRoom} className="btn-gold flex-1 flex items-center justify-center gap-2">
+                <ChevronRight className="h-4 w-4" /> Create Room
               </button>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">Choose Your Piece</label>
-            <div className="space-y-2">
-              {['white', 'black', 'random'].map((piece) => (
-                <label key={piece} className="flex items-center space-x-3 cursor-pointer p-3 rounded-xl hover:bg-white/50 transition-all duration-200">
-                  <input
-                    type="radio"
-                    name="piece"
-                    value={piece}
-                    checked={selectedPiece === piece}
-                    onChange={(e) => setSelectedPiece(e.target.value)}
-                    className="text-primary-600 focus:ring-primary-500 w-4 h-4"
-                  />
-                  <span className="text-gray-700 font-medium capitalize flex items-center gap-2">
-                    {piece} {piece === 'white' ? '♔' : piece === 'black' ? '♚' : '🎲'}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="commentary-mode-create" className="block text-sm font-semibold text-gray-700 mb-2">
-              Commentary Mode
-            </label>
-            <select
-              id="commentary-mode-create"
-              value={commentaryMode}
-              onChange={(e) => setCommentaryMode(e.target.value)}
-              className="input-modern"
-            >
-              <option value="off">Off</option>
-              <option value="roast">Roast</option>
-              <option value="beginner">Beginner's</option>
-              <option value="hype">Hype</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="game-mode-create" className="block text-sm font-semibold text-gray-700 mb-2">
-              Game Mode
-            </label>
-            <select
-              id="game-mode-create"
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className="input-modern"
-            >
-              <option value="manual">Manual</option>
-              <option value="voice">Voice</option>
-            </select>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-300 font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreateRoom}
-              className="btn-primary flex-1"
-            >
-              Create Room
-            </button>
           </div>
         </div>
       </div>
@@ -689,12 +485,12 @@ const ChessDashboard = () => {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className="h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
       {renderNavbar()}
-      <div className="flex-1">
+      <div className="flex-1 overflow-auto">
         {currentView === 'dashboard' && renderDashboard()}
-        {currentView === 'join' && renderJoinRoom()}
-        {currentView === 'create' && renderCreateRoom()}
+        {currentView === 'join'      && renderJoinRoom()}
+        {currentView === 'create'    && renderCreateRoom()}
       </div>
     </div>
   );
